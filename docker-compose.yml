@@ -1,0 +1,15 @@
+services:
+  labnotebook:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - lab_data:/app/data
+    environment:
+      # Set a password to protect the app once it's reachable over the internet.
+      # LABNOTEBOOK_PASSWORD: "change-me"
+      LABNOTEBOOK_PASSWORD: "${LABNOTEBOOK_PASSWORD:-}"
+    restart: unless-stopped
+
+volumes:
+  lab_data:
