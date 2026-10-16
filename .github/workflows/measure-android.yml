@@ -1,0 +1,42 @@
+name: Measure Android app
+
+on:
+  push:
+    paths:
+      - "measure-android/**"
+      - ".github/workflows/measure-android.yml"
+  pull_request:
+    paths:
+      - "measure-android/**"
+      - ".github/workflows/measure-android.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: measure-android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests and APK build
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon testDebugUnitTest assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Measure-apk
+          path: measure-android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error

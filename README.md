@@ -10,6 +10,10 @@ party — your notebook stays private. "Cloud backup" is handled by exporting
 a JSON snapshot and pushing it to this git repository (see **Backups**
 below), so GitHub becomes your off-site copy.
 
+> **Also in this repo:** [`measure-android/`](measure-android/README.md) — an
+> Android AR measuring app (like Apple's Measure), built as an installable APK
+> by GitHub Actions.
+
 ## Features
 
 - **Notebook** — dated, tagged entries, optionally linked to an experiment.
