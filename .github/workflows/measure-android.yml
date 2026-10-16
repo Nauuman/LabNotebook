@@ -25,8 +25,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
-
+      # The Android SDK is preinstalled on GitHub's Ubuntu runners (ANDROID_HOME).
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Unit tests and APK build
