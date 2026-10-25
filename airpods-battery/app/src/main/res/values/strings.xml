@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">PodPulse</string>
+    <string name="widget_name">PodPulse battery</string>
+    <string name="widget_description">AirPods battery for left, right and case</string>
+</resources>
