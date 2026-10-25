@@ -10,7 +10,7 @@ object PodRepository {
     private const val PREFS = "pod_status"
 
     /** Ignore very weak signals: those are almost always someone else's AirPods. */
-    private const val MIN_RSSI = -85
+    private const val MIN_RSSI = -95
 
     /** After this long without hearing the current device, accept any device. */
     private const val SWITCH_AFTER_MS = 10_000L

@@ -2,6 +2,7 @@ package com.personal.podpulse.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,17 +29,22 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.personal.podpulse.ble.ScanDiagnostics
 import com.personal.podpulse.data.PodRepository
 import com.personal.podpulse.data.PodStatus
 import kotlinx.coroutines.delay
@@ -133,6 +139,7 @@ fun MainScreen(env: EnvState, actions: ScreenActions) {
 
             WidgetCard(actions.pinWidget)
             BackgroundCard(env, actions)
+            DiagnosticsCard(env, expandedByDefault = current == null)
 
             Text(
                 text = "Tip: open the case lid next to your phone for an instant reading.",
@@ -337,6 +344,67 @@ private fun BackgroundCard(env: EnvState, actions: ScreenActions) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DiagnosticsCard(env: EnvState, expandedByDefault: Boolean) {
+    val d by ScanDiagnostics.state.collectAsStateWithLifecycle()
+    var expanded by rememberSaveable { mutableStateOf(expandedByDefault) }
+    GlassCard(Modifier.clickable { expanded = !expanded }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Diagnostics",
+                color = TextHi,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(if (expanded) "Hide" else "Show", color = Sky, fontSize = 13.sp)
+        }
+        if (!expanded) return@GlassCard
+        Spacer(Modifier.height(10.dp))
+
+        val hint = when {
+            !env.hasPermissions -> "Permissions not granted yet."
+            !env.bluetoothOn -> "Bluetooth is off."
+            !env.locationOn -> "Location is off: Android hides scan results."
+            d.anyPackets == 0 -> "No Bluetooth packets at all. Check Location is on and " +
+                "PodPulse has Precise location + Nearby devices in App info → Permissions."
+            d.applePackets == 0 -> "Bluetooth works, but no Apple devices are being heard."
+            d.podPackets == 0 -> "Apple devices heard, but no AirPods battery broadcast yet. " +
+                "Open the case lid next to the phone."
+            d.lastPodParsed == false -> "AirPods packets heard but not understood. " +
+                "Send a screenshot of this card."
+            else -> "AirPods packets are being received."
+        }
+        Text(hint, color = Amber, fontSize = 13.sp)
+        Spacer(Modifier.height(10.dp))
+
+        DiagLine("Live scan", d.liveScan)
+        DiagLine("Location", if (env.locationOn) "On" else "Off")
+        DiagLine("Background location", if (env.hasBackgroundLocation) "Allowed" else "Not allowed")
+        DiagLine("Bluetooth packets", d.anyPackets.toString())
+        DiagLine("Apple packets", d.applePackets.toString())
+        DiagLine(
+            "Apple types",
+            d.appleTypes.sorted().joinToString(" ") { "%02X".format(it) }.ifEmpty { "-" },
+        )
+        DiagLine("AirPods packets", d.podPackets.toString())
+        DiagLine("Last signal", d.lastPodRssi?.let { "$it dBm" } ?: "-")
+        d.lastPodHex?.let {
+            Spacer(Modifier.height(6.dp))
+            Text("Last AirPods packet", color = Muted, fontSize = 12.sp)
+            Text(it, color = TextHi, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        }
+    }
+}
+
+@Composable
+private fun DiagLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text(label, color = Muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(value, color = TextHi, fontSize = 13.sp)
     }
 }
 

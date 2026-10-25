@@ -39,22 +39,20 @@ object PodScanner {
         return adapter.bluetoothLeScanner
     }
 
-    /** Matches Apple manufacturer data starting with 07 19 (proximity pairing, 25 bytes). */
-    private fun filters(): List<ScanFilter> {
-        val data = ByteArray(27).apply {
-            this[0] = AirPodsParser.PROXIMITY_PAIRING.toByte()
-            this[1] = 25
-        }
-        val mask = ByteArray(27).apply {
-            this[0] = -1
-            this[1] = -1
-        }
-        return listOf(
-            ScanFilter.Builder()
-                .setManufacturerData(AirPodsParser.APPLE_COMPANY_ID, data, mask)
-                .build(),
-        )
-    }
+    /**
+     * Matches any Apple manufacturer data whose first byte is 0x07 (proximity
+     * pairing). Only the type byte is matched so that packets of any length get
+     * through; a background scan needs a filter to keep running with the screen off.
+     */
+    private fun filters(): List<ScanFilter> = listOf(
+        ScanFilter.Builder()
+            .setManufacturerData(
+                AirPodsParser.APPLE_COMPANY_ID,
+                byteArrayOf(AirPodsParser.PROXIMITY_PAIRING.toByte()),
+                byteArrayOf(-1),
+            )
+            .build(),
+    )
 
     private fun settings(mode: Int): ScanSettings = ScanSettings.Builder()
         .setScanMode(mode)
@@ -62,11 +60,23 @@ object PodScanner {
         .setReportDelay(0)
         .build()
 
+    /**
+     * The live scan is unfiltered (we filter in code instead): some phones'
+     * Bluetooth chips drop packets with hardware manufacturer-data filters.
+     */
     fun startLive(context: Context, callback: ScanCallback): Boolean {
-        val scanner = scanner(context) ?: return false
-        return runCatching {
-            scanner.startScan(filters(), settings(ScanSettings.SCAN_MODE_LOW_LATENCY), callback)
-        }.isSuccess
+        val scanner = scanner(context)
+        if (scanner == null) {
+            ScanDiagnostics.setLiveScan("Unavailable (permission or Bluetooth)")
+            return false
+        }
+        val result = runCatching {
+            scanner.startScan(emptyList(), settings(ScanSettings.SCAN_MODE_LOW_LATENCY), callback)
+        }
+        ScanDiagnostics.setLiveScan(
+            result.exceptionOrNull()?.let { "Failed: ${it.message}" } ?: "Running",
+        )
+        return result.isSuccess
     }
 
     fun stopLive(context: Context, callback: ScanCallback) {
@@ -98,8 +108,13 @@ object PodScanner {
 
     /** Decodes one result and offers it to the repository. Returns true if the widget should refresh. */
     fun handle(context: Context, result: ScanResult): Boolean {
+        ScanDiagnostics.onPacket()
         val data = result.scanRecord?.getManufacturerSpecificData(AirPodsParser.APPLE_COMPANY_ID)
-        val status = AirPodsParser.parse(data, result.rssi, System.currentTimeMillis()) ?: return false
-        return PodRepository.submit(context, status)
+            ?: return false
+        ScanDiagnostics.onApplePacket(data)
+        if (data.isEmpty() || data[0].toInt() != AirPodsParser.PROXIMITY_PAIRING) return false
+        val status = AirPodsParser.parse(data, result.rssi, System.currentTimeMillis())
+        ScanDiagnostics.onPodPacket(data, result.rssi, status != null)
+        return status != null && PodRepository.submit(context, status)
     }
 }

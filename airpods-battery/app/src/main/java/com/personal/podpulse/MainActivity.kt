@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.personal.podpulse.ble.Permissions
 import com.personal.podpulse.ble.PodScanner
+import com.personal.podpulse.ble.ScanDiagnostics
 import com.personal.podpulse.data.AppSettings
 import com.personal.podpulse.ui.EnvState
 import com.personal.podpulse.ui.MainScreen
@@ -49,6 +50,11 @@ class MainActivity : ComponentActivity() {
 
         override fun onBatchScanResults(results: MutableList<ScanResult>) {
             results.forEach(::onResult)
+        }
+
+        override fun onScanFailed(errorCode: Int) {
+            liveScanning = false
+            ScanDiagnostics.setLiveScan("Failed (error $errorCode)")
         }
     }
 
@@ -140,6 +146,7 @@ class MainActivity : ComponentActivity() {
         if (!canScan) {
             // Scans die with Bluetooth; start fresh once it's back.
             liveScanning = false
+            ScanDiagnostics.setLiveScan(if (env.hasPermissions) "Bluetooth off" else "Missing permission")
             backgroundArmed = false
             return
         }
@@ -156,6 +163,7 @@ class MainActivity : ComponentActivity() {
         if (liveScanning) {
             PodScanner.stopLive(this, liveCallback)
             liveScanning = false
+            ScanDiagnostics.setLiveScan("Stopped")
         }
     }
 
