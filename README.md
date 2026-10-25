@@ -107,3 +107,17 @@ backups/    JSON snapshots created by scripts/backup.sh
 - Backend: FastAPI, SQLModel (SQLAlchemy + Pydantic), SQLite
 - Frontend: React, TypeScript, Vite, React Router, Tailwind CSS (via
   `@tailwindcss/postcss`)
+
+## Paycheck Ledger (personal budget app)
+
+`budget/` holds a standalone budget app: pay amounts with predicted paydays,
+credit cards (balance, limit, APR, minimum, due day), savings accounts,
+carry-over savings, payables, a spending breakdown by category with your own
+descriptions under each, goals, and a credit-card payoff plan that keeps a
+safety cushion before putting extra money toward cards.
+
+- `budget/app.html` is the source (published as a Claude artifact, where data
+  is saved privately to your account).
+- Run `budget/build.sh` to produce `budget/index.html`, which you can open
+  directly in a browser; it saves to that browser's local storage. Use
+  Settings → Export backup to move data between devices.
