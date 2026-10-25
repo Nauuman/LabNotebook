@@ -21,7 +21,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import android.text.format.DateUtils
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -31,10 +34,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -45,7 +50,10 @@ import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.personal.podpulse.ble.ScanDiagnostics
+import com.personal.podpulse.data.AppSettings
+import com.personal.podpulse.data.LastSeen
 import com.personal.podpulse.data.PodRepository
+import com.personal.podpulse.features.PairedDevice
 import com.personal.podpulse.data.PodStatus
 import kotlinx.coroutines.delay
 
@@ -57,6 +65,11 @@ data class EnvState(
     val locationOn: Boolean = false,
     val backgroundEnabled: Boolean = true,
     val ignoringBatteryOptimizations: Boolean = true,
+    val notificationsAllowed: Boolean = true,
+    val canDrawOverlays: Boolean = true,
+    val pairedDevices: List<PairedDevice> = emptyList(),
+    val deviceName: String? = null,
+    val flags: Map<String, Boolean> = emptyMap(),
 )
 
 class ScreenActions(
@@ -67,6 +80,12 @@ class ScreenActions(
     val setBackgroundEnabled: (Boolean) -> Unit,
     val requestBatteryExemption: () -> Unit,
     val pinWidget: () -> Unit,
+    val setFlag: (String, Boolean) -> Unit,
+    val selectDevice: (PairedDevice) -> Unit,
+    val requestNotifications: () -> Unit,
+    val requestOverlay: () -> Unit,
+    val openFind: () -> Unit,
+    val openLastSeen: () -> Unit,
 )
 
 private const val LIVE_WINDOW_MS = 30_000L
@@ -128,7 +147,7 @@ fun MainScreen(env: EnvState, actions: ScreenActions) {
                 !env.locationOn -> SetupCard(
                     title = "Location is off",
                     body = "Android only delivers Bluetooth scan results while Location is " +
-                        "switched on. PodPulse never reads your location.",
+                        "switched on. Your location never leaves your phone.",
                     button = "Open settings",
                     onClick = actions.openLocationSettings,
                 )
@@ -137,6 +156,8 @@ fun MainScreen(env: EnvState, actions: ScreenActions) {
             val current = status
             if (current == null) SearchingCard() else PodsCard(current, now)
 
+            FindCard(actions)
+            FeaturesCard(env, actions)
             WidgetCard(actions.pinWidget)
             BackgroundCard(env, actions)
             DiagnosticsCard(env, expandedByDefault = current == null)
@@ -344,6 +365,175 @@ private fun BackgroundCard(env: EnvState, actions: ScreenActions) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FindCard(actions: ScreenActions) {
+    val disconnectedAt by LastSeen.disconnectedAt.collectAsStateWithLifecycle()
+    GlassCard {
+        Text("Find my AirPods", color = TextHi, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Tile(
+                title = "Find nearby",
+                subtitle = "Hotter / colder",
+                modifier = Modifier.weight(1f),
+                onClick = actions.openFind,
+            )
+            Tile(
+                title = "Last seen",
+                subtitle = disconnectedAt?.let {
+                    DateUtils.getRelativeTimeSpanString(
+                        it,
+                        System.currentTimeMillis(),
+                        DateUtils.MINUTE_IN_MILLIS,
+                    ).toString()
+                } ?: "Where you left them",
+                modifier = Modifier.weight(1f),
+                onClick = actions.openLastSeen,
+            )
+        }
+    }
+}
+
+@Composable
+private fun Tile(title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(20.dp)
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(Glass, shape)
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+    ) {
+        Text(title, color = Mint, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(subtitle, color = Muted, fontSize = 12.sp, maxLines = 1)
+    }
+}
+
+@Composable
+private fun FeaturesCard(env: EnvState, actions: ScreenActions) {
+    var pickerOpen by remember { mutableStateOf(false) }
+    GlassCard {
+        Text("Features", color = TextHi, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+
+        Box {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { pickerOpen = true }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("My AirPods", color = TextHi, fontSize = 15.sp)
+                    Text(
+                        env.deviceName ?: "Tap to choose from paired devices",
+                        color = if (env.deviceName == null) Amber else Muted,
+                        fontSize = 13.sp,
+                    )
+                }
+                Text("Change", color = Sky, fontSize = 13.sp)
+            }
+            DropdownMenu(expanded = pickerOpen, onDismissRequest = { pickerOpen = false }) {
+                if (env.pairedDevices.isEmpty()) {
+                    DropdownMenuItem(text = { Text("No paired devices") }, onClick = { pickerOpen = false })
+                }
+                env.pairedDevices.forEach { device ->
+                    DropdownMenuItem(
+                        text = { Text(device.name) },
+                        onClick = {
+                            pickerOpen = false
+                            actions.selectDevice(device)
+                        },
+                    )
+                }
+            }
+        }
+
+        FeatureSwitch(
+            env, actions, AppSettings.AUTO_PAUSE,
+            "Auto-pause",
+            "Pauses music when you take a bud out, resumes when you put it back.",
+        )
+        FeatureSwitch(
+            env, actions, AppSettings.CASE_POPUP,
+            "Connection pop-up",
+            "Shows battery when your AirPods connect, like on an iPhone.",
+        )
+        if (env.flags[AppSettings.CASE_POPUP] == true && !env.canDrawOverlays) {
+            Hint(
+                "Allow \"Display over other apps\" so the pop-up can appear on top. " +
+                    "Until then it shows as a notification.",
+                "Allow",
+                actions.requestOverlay,
+            )
+        }
+        FeatureSwitch(
+            env, actions, AppSettings.LOW_BATTERY,
+            "Low battery alert",
+            "Notifies you when a bud drops to 20%.",
+        )
+        FeatureSwitch(
+            env, actions, AppSettings.REMEMBER_LOCATION,
+            "Remember where I left them",
+            "Saves your phone's location when your AirPods disconnect.",
+        )
+        if (env.flags[AppSettings.REMEMBER_LOCATION] == true && env.hasPermissions && !env.hasBackgroundLocation) {
+            Hint(
+                "Needs Location set to \"Allow all the time\".",
+                "Allow",
+                actions.requestBackgroundLocation,
+            )
+        }
+        if (!env.notificationsAllowed) {
+            Hint(
+                "Notifications are off, so alerts and the battery notification can't show.",
+                "Turn on",
+                actions.requestNotifications,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeatureSwitch(
+    env: EnvState,
+    actions: ScreenActions,
+    key: String,
+    title: String,
+    subtitle: String,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, color = TextHi, fontSize = 15.sp)
+            Text(subtitle, color = Muted, fontSize = 13.sp)
+        }
+        Switch(
+            checked = env.flags[key] ?: true,
+            onCheckedChange = { actions.setFlag(key, it) },
+            colors = SwitchDefaults.colors(checkedThumbColor = Bg0, checkedTrackColor = Mint),
+        )
+    }
+}
+
+@Composable
+private fun Hint(text: String, button: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, color = Amber, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(end = 12.dp))
+        OutlinedButton(onClick = onClick) { Text(button, color = TextHi) }
     }
 }
 

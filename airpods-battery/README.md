@@ -18,6 +18,23 @@ pop-up. PodPulse listens for that packet and decodes:
 
 No pairing hacks, no account, no internet: nothing leaves your phone.
 
+### Extra features
+- **Find nearby:** a hotter/colder meter driven by your AirPods' signal strength.
+- **Last seen:** when your AirPods disconnect, the phone's location is saved,
+  with Open in Maps / Directions buttons.
+- **Auto-pause:** take a bud out and music pauses; put it back and it resumes.
+- **Connection pop-up:** an iPhone-style battery card when the AirPods connect
+  (needs "Display over other apps", otherwise shown as a notification).
+- **Low battery alert:** a notification when a bud drops to 20 %.
+- **Battery notification:** an ongoing notification while connected.
+
+These run in a small foreground service only while your AirPods are connected.
+
+Not possible on Android: Apple's Find My network (live location, play sound),
+noise-control switching, Conversation Awareness, head gestures, 1 % battery,
+spatial audio head tracking and firmware updates. They need an Apple device
+(or, for some, a rooted phone).
+
 - **Live mode:** while the app is open it scans at full speed.
 - **Background mode:** a system-owned, hardware-filtered BLE scan keeps
   delivering AirPods packets to the app even when it's closed, so the widget
@@ -76,6 +93,7 @@ For a reliable widget on Samsung:
 | `data/AirPodsParser.kt` | Decodes the BLE packet (unit-tested) |
 | `data/PodRepository.kt` | Picks your AirPods, keeps/persists the latest reading |
 | `ble/PodScanner.kt` | Live + background BLE scanning |
-| `ble/ScanResultReceiver.kt`, `ble/RearmReceiver.kt` | Background delivery and re-arming |
+| `ble/ScanResultReceiver.kt`, `ble/BluetoothEventsReceiver.kt` | Background delivery, re-arming, connect/disconnect |
+| `features/` | Connected-mode service, ear detection, alerts, last-seen location, finder |
 | `widget/PodWidget.kt` | Home screen widget (Jetpack Glance) |
 | `ui/` | Compose UI: animated battery rings, setup cards |

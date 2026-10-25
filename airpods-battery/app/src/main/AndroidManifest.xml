@@ -10,12 +10,18 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- AirPods battery is read from Bluetooth LE advertisements, which Android
-         only delivers to apps holding location permission. -->
+         only delivers to apps holding location permission. Location is also used
+         to remember where your AirPods were when they disconnected. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Lets the case-open pop-up appear over other apps, like on an iPhone. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:name=".PodPulseApp"
@@ -40,15 +46,31 @@
             android:name=".ble.ScanResultReceiver"
             android:exported="false" />
 
-        <!-- Re-registers the background scan after reboot, app update, or when
-             a Bluetooth device (your AirPods) connects. -->
+        <activity
+            android:name=".ui.PopupActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.PodPulse.Popup" />
+
+        <!-- Live ear detection, case pop-up and battery notification while connected. -->
+        <service
+            android:name=".features.PodService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- Re-arms the background scan after reboot/update, and tracks when your
+             AirPods connect or disconnect. -->
         <receiver
-            android:name=".ble.RearmReceiver"
+            android:name=".ble.BluetoothEventsReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
             </intent-filter>
         </receiver>
 

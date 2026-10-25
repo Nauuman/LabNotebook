@@ -16,7 +16,9 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
+import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,6 +31,12 @@ import com.personal.podpulse.ble.Permissions
 import com.personal.podpulse.ble.PodScanner
 import com.personal.podpulse.ble.ScanDiagnostics
 import com.personal.podpulse.data.AppSettings
+import com.personal.podpulse.data.Place
+import com.personal.podpulse.features.Alerts
+import com.personal.podpulse.features.BtDevices
+import com.personal.podpulse.features.PodService
+import com.personal.podpulse.ui.FindScreen
+import com.personal.podpulse.ui.LastSeenScreen
 import com.personal.podpulse.ui.EnvState
 import com.personal.podpulse.ui.MainScreen
 import com.personal.podpulse.ui.PodPulseTheme
@@ -42,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private var env by mutableStateOf(EnvState())
     private var liveScanning = false
     private var backgroundArmed = false
+    private var serviceChecked = false
 
     private val liveCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -78,7 +87,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val actions = ScreenActions(
-            requestPermissions = { permissionLauncher.launch(Permissions.foreground) },
+            requestPermissions = { permissionLauncher.launch(Permissions.foreground + notificationPermission()) },
             requestBackgroundLocation = ::requestBackgroundLocation,
             enableBluetooth = ::enableBluetooth,
             openLocationSettings = {
@@ -91,17 +100,53 @@ class MainActivity : ComponentActivity() {
             },
             requestBatteryExemption = ::requestBatteryExemption,
             pinWidget = ::pinWidget,
+            setFlag = { key, enabled ->
+                AppSettings.setFlag(this, key, enabled)
+                serviceChecked = false
+                refresh()
+            },
+            selectDevice = { device ->
+                AppSettings.setDevice(this, device.address, device.name)
+                serviceChecked = false
+                refresh()
+            },
+            requestNotifications = ::requestNotifications,
+            requestOverlay = {
+                runCatching {
+                    startActivity(
+                        Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")),
+                    )
+                }
+            },
+            openFind = { screen = Screen.Find },
+            openLastSeen = { screen = Screen.LastSeen },
         )
 
         setContent {
             PodPulseTheme {
-                MainScreen(env, actions)
+                BackHandler(enabled = screen != Screen.Home) { screen = Screen.Home }
+                when (screen) {
+                    Screen.Home -> MainScreen(env, actions)
+                    Screen.Find -> FindScreen(onBack = { screen = Screen.Home })
+                    Screen.LastSeen -> LastSeenScreen(
+                        onBack = { screen = Screen.Home },
+                        openMap = ::openMap,
+                        directions = ::openDirections,
+                        hasBackgroundLocation = env.hasBackgroundLocation,
+                        requestBackgroundLocation = ::requestBackgroundLocation,
+                    )
+                }
             }
         }
     }
 
+    private enum class Screen { Home, Find, LastSeen }
+
+    private var screen by mutableStateOf(Screen.Home)
+
     override fun onStart() {
         super.onStart()
+        isVisible = true
         ContextCompat.registerReceiver(
             this,
             bluetoothStateReceiver,
@@ -121,6 +166,8 @@ class MainActivity : ComponentActivity() {
         unregisterReceiver(bluetoothStateReceiver)
         stopLive()
         backgroundArmed = false
+        serviceChecked = false
+        isVisible = false
         super.onStop()
     }
 
@@ -140,6 +187,16 @@ class MainActivity : ComponentActivity() {
             locationOn = Permissions.isLocationOn(this),
             backgroundEnabled = AppSettings.backgroundEnabled(this),
             ignoringBatteryOptimizations = Permissions.isIgnoringBatteryOptimizations(this),
+            notificationsAllowed = Alerts.canNotify(this),
+            canDrawOverlays = Settings.canDrawOverlays(this),
+            pairedDevices = BtDevices.paired(this),
+            deviceName = AppSettings.deviceName(this),
+            flags = listOf(
+                AppSettings.AUTO_PAUSE,
+                AppSettings.CASE_POPUP,
+                AppSettings.LOW_BATTERY,
+                AppSettings.REMEMBER_LOCATION,
+            ).associateWith { AppSettings.flag(this, it) },
         )
 
         val canScan = env.hasPermissions && env.bluetoothOn
@@ -157,6 +214,63 @@ class MainActivity : ComponentActivity() {
             if (env.backgroundEnabled) PodScanner.armBackground(this) else PodScanner.disarmBackground(this)
             backgroundArmed = true
         }
+        if (!serviceChecked) {
+            serviceChecked = true
+            BtDevices.autoSelect(this)
+            env = env.copy(deviceName = AppSettings.deviceName(this))
+            // Start the connected-mode service now if the AirPods are already connected.
+            if (PodService.needed(this)) {
+                BtDevices.queryConnected(this) { connected ->
+                    if (connected) PodService.start(this)
+                }
+            } else {
+                PodService.stop(this)
+            }
+        }
+    }
+
+    private fun notificationPermission(): Array<String> =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            emptyArray()
+        }
+
+    private fun requestNotifications() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED &&
+            !askedNotifications
+        ) {
+            // Ask once in-app; after that Android only allows changing it in settings.
+            askedNotifications = true
+            permissionLauncher.launch(notificationPermission())
+            return
+        }
+        runCatching {
+            startActivity(
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
+            )
+        }
+    }
+
+    private var askedNotifications = false
+
+    private fun openMap(place: Place) {
+        val uri = Uri.parse(
+            "geo:${place.latitude},${place.longitude}?q=${place.latitude},${place.longitude}(My AirPods)",
+        )
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, uri)) }.onFailure {
+            Toast.makeText(this, "No maps app found", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openDirections(place: Place) {
+        val uri = Uri.parse(
+            "https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}&travelmode=walking",
+        )
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
     }
 
     private fun stopLive() {
@@ -191,6 +305,13 @@ class MainActivity : ComponentActivity() {
                     .setData(Uri.parse("package:$packageName")),
             )
         }
+    }
+
+    companion object {
+        /** Lets the service skip the pop-up while the app itself is on screen. */
+        @Volatile
+        var isVisible = false
+            private set
     }
 
     private fun pinWidget() {

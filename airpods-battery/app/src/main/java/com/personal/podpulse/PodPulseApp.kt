@@ -2,6 +2,7 @@ package com.personal.podpulse
 
 import android.app.Application
 import android.content.Context
+import com.personal.podpulse.data.LastSeen
 import com.personal.podpulse.data.PodRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +14,7 @@ class PodPulseApp : Application() {
     override fun onCreate() {
         super.onCreate()
         PodRepository.init(this)
+        LastSeen.init(this)
     }
 
     companion object {

@@ -14,6 +14,8 @@ import android.content.Intent
 import android.os.Build
 import com.personal.podpulse.data.AirPodsParser
 import com.personal.podpulse.data.PodRepository
+import com.personal.podpulse.features.Alerts
+import com.personal.podpulse.features.FindSignal
 
 /**
  * Two scanning modes:
@@ -79,6 +81,14 @@ object PodScanner {
         return result.isSuccess
     }
 
+    /** Filtered full-speed scan, which (unlike an unfiltered one) keeps running with the screen off. */
+    fun startFiltered(context: Context, callback: ScanCallback): Boolean {
+        val scanner = scanner(context) ?: return false
+        return runCatching {
+            scanner.startScan(filters(), settings(ScanSettings.SCAN_MODE_LOW_LATENCY), callback)
+        }.isSuccess
+    }
+
     fun stopLive(context: Context, callback: ScanCallback) {
         val scanner = scanner(context) ?: return
         runCatching { scanner.stopScan(callback) }
@@ -115,6 +125,10 @@ object PodScanner {
         if (data.isEmpty() || data[0].toInt() != AirPodsParser.PROXIMITY_PAIRING) return false
         val status = AirPodsParser.parse(data, result.rssi, System.currentTimeMillis())
         ScanDiagnostics.onPodPacket(data, result.rssi, status != null)
-        return status != null && PodRepository.submit(context, status)
+        if (status == null) return false
+        FindSignal.offer(status)
+        if (!PodRepository.submit(context, status)) return false
+        Alerts.checkLowBattery(context, status)
+        return true
     }
 }
