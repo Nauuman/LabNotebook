@@ -121,3 +121,21 @@ safety cushion before putting extra money toward cards.
 - Run `budget/build.sh` to produce `budget/index.html`, which you can open
   directly in a browser; it saves to that browser's local storage. Use
   Settings → Export backup to move data between devices.
+
+### Android app
+
+`budget/android/` is an Android app (package `com.nauuman.paycheckledger`)
+that shows the same page full screen, works offline, and keeps your data on
+the phone. Every push that changes `budget/` builds it with GitHub Actions
+(`.github/workflows/android-budget.yml`) and publishes `PaycheckLedger.apk`
+as a GitHub Release.
+
+To install: on your phone open this repo's **Releases** page, tap
+`PaycheckLedger.apk` in the newest release, then open the download. Android
+asks once to allow installs from your browser or Files app.
+
+- New builds install over the old one and keep your data, because every
+  build is signed with the same key (`app/paycheck-ledger.keystore`).
+  Uninstalling the app deletes its data, so use Settings → Export backup first.
+- To build it yourself: open `budget/android` in Android Studio, or run
+  `sh budget/build.sh && cd budget/android && ./gradlew assembleRelease`.

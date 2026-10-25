@@ -823,7 +823,7 @@ function vSettings() {
       <div class="field"><label for="set-str">Default payoff strategy</label><select id="set-str" name="strategy"><option value="avalanche" ${S.settings.strategy === 'avalanche' ? 'selected' : ''}>Highest rate first (saves most)</option><option value="snowball" ${S.settings.strategy === 'snowball' ? 'selected' : ''}>Smallest balance first (quick wins)</option></select></div>
       <button type="submit" class="primary">Save settings</button>
     </form>
-    <p class="small muted" style="margin:0">${store.kind === 'cloud' ? 'Your budget is saved to your Claude account and only you can see it.' : 'Your budget is saved in this browser only. Export a backup to move it to another device.'}</p>
+    <p class="small muted" style="margin:0">${store.kind === 'cloud' ? 'Your budget is saved to your Claude account and only you can see it.' : window.AndroidBridge ? 'Your budget is saved on this phone only. Export a backup regularly, and before uninstalling the app or changing phones.' : 'Your budget is saved in this browser only. Export a backup to move it to another device.'}</p>
   </section>
   <section class="panel"><h2>Backup</h2>
     <div class="panel-head"><span class="muted small" style="margin-right:auto">Export everything as a JSON file, or restore from one.</span><button data-action="export">Export backup</button><button data-action="import">Import backup</button></div>
@@ -1010,6 +1010,7 @@ const actions = {
   'edit-item': (id, el) => { const c = catById(id); const it = c.items.find(i => i.id === el.dataset.item); openForm({ title: `${c.name} · description`, values: it, fields: [{ key: 'label', label: 'Description', required: true }, { key: 'note', label: 'Your notes', type: 'textarea' }], onSave: v => { Object.assign(it, v); commit(); }, onDelete: () => { c.items = c.items.filter(i => i !== it); commit(); } }); },
   export: async () => {
     const data = JSON.stringify(S, null, 2); const filename = `paycheck-ledger-${iso(today())}.json`;
+    if (window.AndroidBridge) { window.AndroidBridge.saveFile(filename, data); return; }
     let dl = null; try { dl = window.claude && await window.claude.use('downloads'); } catch {}
     if (dl) { try { await dl.save({ filename, data }); } catch { toast('Backup was not saved.'); } return; }
     try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); a.download = filename; a.click(); } catch {}
@@ -1040,6 +1041,15 @@ $('#import-file').addEventListener('change', async e => {
 
 let toastT;
 function toast(msg) { let t = $('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); } t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600); }
+
+// hooks for the Android app shell
+window.__appToast = toast;
+window.__appBack = () => {
+  const scrim = $('.scrim'); if (scrim) { scrim.remove(); return true; }
+  if (view.tab !== 'overview') { actions.tab('overview'); return true; }
+  return false;
+};
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && saveTimer && S && !S.example) flushNow(); });
 
 initStore().then(render);
 })();

@@ -18,3 +18,9 @@ frontend/dist/
 .DS_Store
 .vscode/
 *.log
+
+# Android budget app
+budget/android/.gradle/
+budget/android/build/
+budget/android/app/build/
+budget/android/local.properties

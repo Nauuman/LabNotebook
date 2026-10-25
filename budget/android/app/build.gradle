@@ -1,0 +1,54 @@
+plugins {
+    id 'com.android.application'
+}
+
+// CI sets GITHUB_RUN_NUMBER so every build installs as an update over the last one.
+def buildNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'com.nauuman.paycheckledger'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.nauuman.paycheckledger'
+        minSdk 26
+        targetSdk 35
+        versionCode buildNumber
+        versionName "1.${buildNumber}"
+    }
+
+    // A fixed key, so each new APK installs over the previous one and keeps your data.
+    signingConfigs {
+        ledger {
+            storeFile file('paycheck-ledger.keystore')
+            storePassword 'paycheckledger'
+            keyAlias 'paycheckledger'
+            keyPassword 'paycheckledger'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.ledger
+        }
+        debug {
+            signingConfig signingConfigs.ledger
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.15.0'
+    implementation 'androidx.webkit:webkit:1.12.1'
+}

@@ -1,0 +1,53 @@
+name: Paycheck Ledger Android app
+
+on:
+  push:
+    paths:
+      - 'budget/**'
+      - '.github/workflows/android-budget.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Copy the app page into the Android project
+        run: sh budget/build.sh
+
+      - name: Build the APK
+        working-directory: budget/android
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Name the APK
+        run: cp budget/android/app/build/outputs/apk/release/app-release.apk PaycheckLedger.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PaycheckLedger-apk
+          path: PaycheckLedger.apk
+
+      - name: Publish a release with the APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: paycheck-ledger-${{ github.run_number }}
+          name: Paycheck Ledger (build ${{ github.run_number }})
+          target_commitish: ${{ github.sha }}
+          files: PaycheckLedger.apk
+          body: |
+            Android app for Paycheck Ledger. On your phone, tap PaycheckLedger.apk below to download it, then open it to install.
+            Android may ask you to allow installs from your browser or Files app the first time.
+            New builds install over the old one and keep your data.
