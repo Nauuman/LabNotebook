@@ -13,6 +13,7 @@ class PodPulseApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashLog.install(this)
         PodRepository.init(this)
         LastSeen.init(this)
     }

@@ -75,4 +75,14 @@ class AirPodsParserTest {
         assertNull(AirPodsParser.parse(null, -50, 1L))
         assertNull(AirPodsParser.parse(packet(0x1420, 0x20, 0xFF, 0x0F), -50, 1L))
     }
+
+    @Test
+    fun chargingBudIsNeverInEar() {
+        // not flipped; in-ear flags set for both, but left (0x01) and right (0x02) charging
+        val s = AirPodsParser.parse(packet(0x1420, 0x2B, 0x99, 0x35), -50, 1L)!!
+        assertTrue(s.leftCharging)
+        assertTrue(s.rightCharging)
+        assertFalse(s.leftInEar)
+        assertFalse(s.rightInEar)
+    }
 }

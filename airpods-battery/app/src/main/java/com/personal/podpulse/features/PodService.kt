@@ -14,6 +14,7 @@ import android.view.KeyEvent
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.personal.podpulse.MainActivity
+import com.personal.podpulse.ble.Permissions
 import com.personal.podpulse.ble.PodScanner
 import com.personal.podpulse.data.AppSettings
 import com.personal.podpulse.data.PodRepository
@@ -50,6 +51,9 @@ class PodService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    // Don't let the system resurrect us from the background; the next connect restarts us.
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
+
     override fun onCreate() {
         super.onCreate()
         audio = getSystemService(AudioManager::class.java)
@@ -67,6 +71,13 @@ class PodService : Service() {
             )
         }.isSuccess
         if (!started) {
+            stopSelf()
+            return
+        }
+        running = this
+        // A disconnect may have arrived before we got this far.
+        if (stopRequested) {
+            stopRequested = false
             stopSelf()
             return
         }
@@ -104,8 +115,13 @@ class PodService : Service() {
         }
     }
 
+    private var lastPopup = 0L
+
     private fun showPopup() {
         if (!AppSettings.flag(this, AppSettings.CASE_POPUP) || MainActivity.isVisible) return
+        val now = System.currentTimeMillis()
+        if (now - lastPopup < POPUP_COOLDOWN_MS) return
+        lastPopup = now
         val status = PodRepository.status.value ?: return
         if (Settings.canDrawOverlays(this)) {
             val launched = runCatching {
@@ -124,6 +140,7 @@ class PodService : Service() {
     }
 
     override fun onDestroy() {
+        if (running === this) running = null
         if (scanning) PodScanner.stopLive(this, callback)
         scope.cancel()
         super.onDestroy()
@@ -131,6 +148,14 @@ class PodService : Service() {
 
     companion object {
         private const val POPUP_GAP_MS = 30_000L
+        private const val POPUP_COOLDOWN_MS = 2 * 60_000L
+
+        /** The live instance once it's safely in the foreground. */
+        @Volatile
+        private var running: PodService? = null
+
+        @Volatile
+        private var stopRequested = false
 
         /** Only worth running when a feature that needs fast updates is on. */
         fun needed(context: Context): Boolean =
@@ -138,7 +163,10 @@ class PodService : Service() {
                 AppSettings.flag(context, AppSettings.CASE_POPUP)
 
         fun start(context: Context) {
-            if (!needed(context)) return
+            // Android 14 refuses a connectedDevice service without Bluetooth permission,
+            // which would crash the app a few seconds later.
+            if (!needed(context) || !Permissions.hasForeground(context)) return
+            stopRequested = false
             // Throws on Android 12+ if we're in the background without an exemption
             // (exempt once battery optimisation is off for PodPulse).
             runCatching {
@@ -146,8 +174,14 @@ class PodService : Service() {
             }
         }
 
-        fun stop(context: Context) {
-            context.stopService(Intent(context, PodService::class.java))
+        /**
+         * Never stopService() a service that may not have called startForeground()
+         * yet: Android crashes the app for that. Ask the running instance to stop
+         * itself, or leave a note for one that's still starting.
+         */
+        fun stop() {
+            val service = running
+            if (service != null) service.stopSelf() else stopRequested = true
         }
     }
 }

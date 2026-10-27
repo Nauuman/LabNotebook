@@ -22,6 +22,8 @@ object Alerts {
 
     private const val LOW_THRESHOLD = 20
     private const val RESET_THRESHOLD = 40
+    private const val LOW_COOLDOWN_MS = 3 * 60 * 60_000L
+    private const val CONNECTED_COOLDOWN_MS = 10 * 60_000L
 
     fun ensureChannels(context: Context) {
         NotificationManagerCompat.from(context).createNotificationChannelsCompat(
@@ -87,6 +89,10 @@ object Alerts {
 
     /** Fallback for the case pop-up when "display over other apps" isn't allowed. */
     fun showConnected(context: Context, s: PodStatus) {
+        val prefs = context.getSharedPreferences("alerts", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        if (now - prefs.getLong("connected_at", 0L) < CONNECTED_COOLDOWN_MS) return
+        prefs.edit().putLong("connected_at", now).apply()
         ensureChannels(context)
         post(
             context,
@@ -115,8 +121,10 @@ object Alerts {
         val prefs = context.getSharedPreferences("alerts", Context.MODE_PRIVATE)
         val alerted = prefs.getBoolean("low_alerted", false)
         val low = buds.filter { (_, level, charging) -> level != null && level <= LOW_THRESHOLD && !charging }
+        val now = System.currentTimeMillis()
+        val cooledDown = now - prefs.getLong("low_alerted_at", 0L) > LOW_COOLDOWN_MS
 
-        if (low.isNotEmpty() && !alerted) {
+        if (low.isNotEmpty() && !alerted && cooledDown) {
             ensureChannels(context)
             val lowest = low.minOf { it.second!! }
             val names = low.joinToString(" and ") { it.first.lowercase() }
@@ -134,7 +142,7 @@ object Alerts {
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .build(),
             )
-            prefs.edit().putBoolean("low_alerted", true).apply()
+            prefs.edit().putBoolean("low_alerted", true).putLong("low_alerted_at", now).apply()
         } else if (alerted && buds.all { (_, level, charging) -> charging || level == null || level >= RESET_THRESHOLD }) {
             prefs.edit().putBoolean("low_alerted", false).apply()
         }

@@ -38,7 +38,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -70,6 +74,7 @@ data class EnvState(
     val pairedDevices: List<PairedDevice> = emptyList(),
     val deviceName: String? = null,
     val flags: Map<String, Boolean> = emptyMap(),
+    val crashReport: String? = null,
 )
 
 class ScreenActions(
@@ -86,6 +91,7 @@ class ScreenActions(
     val requestOverlay: () -> Unit,
     val openFind: () -> Unit,
     val openLastSeen: () -> Unit,
+    val dismissCrash: () -> Unit,
 )
 
 private const val LIVE_WINDOW_MS = 30_000L
@@ -128,6 +134,8 @@ fun MainScreen(env: EnvState, actions: ScreenActions) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Header(status, now)
+
+            env.crashReport?.let { CrashCard(it, actions.dismissCrash) }
 
             when {
                 !env.hasPermissions -> SetupCard(
@@ -552,40 +560,87 @@ private fun DiagnosticsCard(env: EnvState, expandedByDefault: Boolean) {
             )
             Text(if (expanded) "Hide" else "Show", color = Sky, fontSize = 13.sp)
         }
-        if (!expanded) return@GlassCard
-        Spacer(Modifier.height(10.dp))
+        if (expanded) {
+            Spacer(Modifier.height(10.dp))
+            val hint = when {
+                !env.hasPermissions -> "Permissions not granted yet."
+                !env.bluetoothOn -> "Bluetooth is off."
+                !env.locationOn -> "Location is off: Android hides scan results."
+                d.anyPackets == 0 -> "No Bluetooth packets at all. Check Location is on and " +
+                    "PodPulse has Precise location + Nearby devices in App info → Permissions."
+                d.applePackets == 0 -> "Bluetooth works, but no Apple devices are being heard."
+                d.podPackets == 0 -> "Apple devices heard, but no AirPods battery broadcast yet. " +
+                    "Open the case lid next to the phone."
+                d.lastPodParsed == false -> "AirPods packets heard but not understood. " +
+                    "Send a screenshot of this card."
+                else -> "AirPods packets are being received."
+            }
+            Text(hint, color = Amber, fontSize = 13.sp)
+            Spacer(Modifier.height(10.dp))
 
-        val hint = when {
-            !env.hasPermissions -> "Permissions not granted yet."
-            !env.bluetoothOn -> "Bluetooth is off."
-            !env.locationOn -> "Location is off: Android hides scan results."
-            d.anyPackets == 0 -> "No Bluetooth packets at all. Check Location is on and " +
-                "PodPulse has Precise location + Nearby devices in App info → Permissions."
-            d.applePackets == 0 -> "Bluetooth works, but no Apple devices are being heard."
-            d.podPackets == 0 -> "Apple devices heard, but no AirPods battery broadcast yet. " +
-                "Open the case lid next to the phone."
-            d.lastPodParsed == false -> "AirPods packets heard but not understood. " +
-                "Send a screenshot of this card."
-            else -> "AirPods packets are being received."
+            DiagLine("Live scan", d.liveScan)
+            DiagLine("Location", if (env.locationOn) "On" else "Off")
+            DiagLine("Background location", if (env.hasBackgroundLocation) "Allowed" else "Not allowed")
+            DiagLine("Bluetooth packets", d.anyPackets.toString())
+            DiagLine("Apple packets", d.applePackets.toString())
+            DiagLine(
+                "Apple types",
+                d.appleTypes.sorted().joinToString(" ") { "%02X".format(it) }.ifEmpty { "-" },
+            )
+            DiagLine("AirPods packets", d.podPackets.toString())
+            if (d.recent.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text("Latest AirPods packets (raw → decoded)", color = Muted, fontSize = 12.sp)
+                d.recent.forEach { p ->
+                    Text(
+                        "${p.hex}  ${p.rssi}dBm\n  → ${p.decoded}",
+                        color = TextHi,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
         }
-        Text(hint, color = Amber, fontSize = 13.sp)
-        Spacer(Modifier.height(10.dp))
+    }
+}
 
-        DiagLine("Live scan", d.liveScan)
-        DiagLine("Location", if (env.locationOn) "On" else "Off")
-        DiagLine("Background location", if (env.hasBackgroundLocation) "Allowed" else "Not allowed")
-        DiagLine("Bluetooth packets", d.anyPackets.toString())
-        DiagLine("Apple packets", d.applePackets.toString())
-        DiagLine(
-            "Apple types",
-            d.appleTypes.sorted().joinToString(" ") { "%02X".format(it) }.ifEmpty { "-" },
+@Composable
+private fun CrashCard(report: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    GlassCard {
+        Text(
+            "PodPulse crashed last time",
+            color = Coral,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
         )
-        DiagLine("AirPods packets", d.podPackets.toString())
-        DiagLine("Last signal", d.lastPodRssi?.let { "$it dBm" } ?: "-")
-        d.lastPodHex?.let {
-            Spacer(Modifier.height(6.dp))
-            Text("Last AirPods packet", color = Muted, fontSize = 12.sp)
-            Text(it, color = TextHi, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Tap Copy and paste the report to Claude so it can be fixed.",
+            color = Muted,
+            fontSize = 13.sp,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            report.lines().take(12).joinToString("\n"),
+            color = TextHi,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = {
+                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("PodPulse crash", report))
+                    Toast.makeText(context, "Crash report copied", Toast.LENGTH_SHORT).show()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Bg0),
+            ) {
+                Text("Copy", fontWeight = FontWeight.SemiBold)
+            }
+            OutlinedButton(onClick = onDismiss) { Text("Dismiss", color = TextHi) }
         }
     }
 }

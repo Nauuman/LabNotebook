@@ -124,11 +124,17 @@ object PodScanner {
         ScanDiagnostics.onApplePacket(data)
         if (data.isEmpty() || data[0].toInt() != AirPodsParser.PROXIMITY_PAIRING) return false
         val status = AirPodsParser.parse(data, result.rssi, System.currentTimeMillis())
-        ScanDiagnostics.onPodPacket(data, result.rssi, status != null)
+        ScanDiagnostics.onPodPacket(
+            data,
+            result.rssi,
+            status?.let { "L ${it.left ?: "-"} R ${it.right ?: "-"} C ${it.case ?: "-"} " +
+                "ear ${if (it.leftInEar) "L" else ""}${if (it.rightInEar) "R" else ""}" },
+        )
         if (status == null) return false
         FindSignal.offer(status)
         if (!PodRepository.submit(context, status)) return false
-        Alerts.checkLowBattery(context, status)
+        // Alert on the smoothed reading, never on a single packet.
+        PodRepository.status.value?.let { Alerts.checkLowBattery(context, it) }
         return true
     }
 }

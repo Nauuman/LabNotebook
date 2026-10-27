@@ -19,7 +19,7 @@ object AirPodsParser {
     const val PROXIMITY_PAIRING = 0x07
 
     fun parse(data: ByteArray?, rssi: Int, timestamp: Long): PodStatus? {
-        if (data == null || data.size < 8) return null
+        if (data == null || data.size < 10) return null
         if (data[0].u() != PROXIMITY_PAIRING) return null
 
         val modelId = (data[3].u() shl 8) or data[4].u()
@@ -48,16 +48,19 @@ object AirPodsParser {
         val case = level(flags and 0x0F)
         if (left == null && right == null && case == null) return null
 
+        val leftCharging = (charging and (if (flipped) 0x02 else 0x01)) != 0
+        val rightCharging = (charging and (if (flipped) 0x01 else 0x02)) != 0
         return PodStatus(
             modelId = modelId,
             left = left,
             right = right,
             case = case,
-            leftCharging = (charging and (if (flipped) 0x02 else 0x01)) != 0,
-            rightCharging = (charging and (if (flipped) 0x01 else 0x02)) != 0,
+            leftCharging = leftCharging,
+            rightCharging = rightCharging,
             caseCharging = (charging and 0x04) != 0,
-            leftInEar = (status and (if (flipped) 0x08 else 0x02)) != 0,
-            rightInEar = (status and (if (flipped) 0x02 else 0x08)) != 0,
+            // A bud that's charging is sitting in the case, whatever the ear flag says.
+            leftInEar = !leftCharging && (status and (if (flipped) 0x08 else 0x02)) != 0,
+            rightInEar = !rightCharging && (status and (if (flipped) 0x02 else 0x08)) != 0,
             rssi = rssi,
             timestamp = timestamp,
         )

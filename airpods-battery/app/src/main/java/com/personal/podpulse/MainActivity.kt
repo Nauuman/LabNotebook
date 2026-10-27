@@ -120,6 +120,10 @@ class MainActivity : ComponentActivity() {
             },
             openFind = { screen = Screen.Find },
             openLastSeen = { screen = Screen.LastSeen },
+            dismissCrash = {
+                CrashLog.clear(this)
+                refresh()
+            },
         )
 
         setContent {
@@ -197,6 +201,7 @@ class MainActivity : ComponentActivity() {
                 AppSettings.LOW_BATTERY,
                 AppSettings.REMEMBER_LOCATION,
             ).associateWith { AppSettings.flag(this, it) },
+            crashReport = CrashLog.read(this),
         )
 
         val canScan = env.hasPermissions && env.bluetoothOn
@@ -224,7 +229,7 @@ class MainActivity : ComponentActivity() {
                     if (connected) PodService.start(this)
                 }
             } else {
-                PodService.stop(this)
+                PodService.stop()
             }
         }
     }

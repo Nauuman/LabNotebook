@@ -18,12 +18,20 @@ object PodRepository {
     /** A new device must be at most this much weaker to replace the current one. */
     private const val RSSI_HYSTERESIS = 10
 
+    /** While the current device is fresh, packets from a different model are ignored. */
+    private const val MODEL_LOCK_MS = 60_000L
+
+    /** Readings are the consensus of packets from this recent window. */
+    private const val WINDOW_MS = 15_000L
+    private const val WINDOW_MAX = 20
+
     private const val PERSIST_INTERVAL_MS = 30_000L
     private const val WIDGET_REFRESH_MS = 5 * 60_000L
 
     private val _status = MutableStateFlow<PodStatus?>(null)
     val status: StateFlow<PodStatus?> = _status.asStateFlow()
 
+    private val window = ArrayDeque<PodStatus>()
     private var loaded = false
     private var lastPersist = 0L
     private var lastWidgetPush = 0L
@@ -50,17 +58,24 @@ object PodRepository {
         if (candidate.rssi < MIN_RSSI) return false
 
         val current = _status.value
-        val accept = current == null ||
-            candidate.timestamp - current.timestamp > SWITCH_AFTER_MS ||
-            candidate.rssi >= current.rssi - RSSI_HYSTERESIS
+        val age = if (current == null) Long.MAX_VALUE else candidate.timestamp - current.timestamp
+        if (current != null && candidate.modelId != current.modelId && age < MODEL_LOCK_MS) return false
+        val accept = age > SWITCH_AFTER_MS || candidate.rssi >= current!!.rssi - RSSI_HYSTERESIS
         if (!accept) return false
 
-        val changed = current == null || !candidate.sameReadingAs(current)
-        _status.value = candidate
+        if (window.isNotEmpty() && window.last().modelId != candidate.modelId) window.clear()
+        window.addLast(candidate)
+        while (window.size > WINDOW_MAX || candidate.timestamp - window.first().timestamp > WINDOW_MS) {
+            window.removeFirst()
+        }
+        val stable = Consensus.of(window)
 
-        val now = candidate.timestamp
+        val changed = current == null || !stable.sameReadingAs(current)
+        _status.value = stable
+
+        val now = stable.timestamp
         if (changed || now - lastPersist > PERSIST_INTERVAL_MS) {
-            save(context, candidate)
+            save(context, stable)
             lastPersist = now
         }
         val refreshWidget = changed || now - lastWidgetPush > WIDGET_REFRESH_MS

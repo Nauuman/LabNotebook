@@ -33,7 +33,7 @@ class BluetoothEventsReceiver : BroadcastReceiver() {
             }
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                 if (device == null || !BtDevices.isMine(context, device)) return
-                PodService.stop(context)
+                PodService.stop()
                 LastSeen.markDisconnected(context, System.currentTimeMillis())
                 if (!AppSettings.flag(context, AppSettings.REMEMBER_LOCATION)) return
                 val pending = goAsync()
