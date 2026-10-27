@@ -10,7 +10,9 @@ package com.personal.podpulse.data
  *   1     remaining length
  *   2     prefix
  *   3-4   model ID (e.g. 0x0E20 = AirPods Pro)
- *   5     status: bit 0x20 tells which bud is "primary"; low nibble = in-ear flags
+ *   5     status, about the bud that's broadcasting ("this" bud):
+ *           0x02 this bud in ear, 0x08 other bud in ear, 0x04 both buds in case,
+ *           0x10 one bud in case, 0x20 this bud is the left one, 0x40 this bud in case
  *   6     bud batteries, one nibble each (0-10 = 0-100 %, 15 = unavailable)
  *   7     high nibble = charging flags, low nibble = case battery
  */
@@ -50,6 +52,14 @@ object AirPodsParser {
 
         val leftCharging = (charging and (if (flipped) 0x02 else 0x01)) != 0
         val rightCharging = (charging and (if (flipped) 0x01 else 0x02)) != 0
+
+        // A charging bud is always in the case, whatever the flags say.
+        val thisIsLeft = !flipped
+        val thisInCase = (status and 0x40) != 0
+        val bothInCase = (status and 0x04) != 0
+        val oneInCase = (status and 0x10) != 0
+        val leftInCase = leftCharging || bothInCase || (oneInCase && thisInCase == thisIsLeft)
+        val rightInCase = rightCharging || bothInCase || (oneInCase && thisInCase != thisIsLeft)
         return PodStatus(
             modelId = modelId,
             left = left,
@@ -58,9 +68,10 @@ object AirPodsParser {
             leftCharging = leftCharging,
             rightCharging = rightCharging,
             caseCharging = (charging and 0x04) != 0,
-            // A bud that's charging is sitting in the case, whatever the ear flag says.
-            leftInEar = !leftCharging && (status and (if (flipped) 0x08 else 0x02)) != 0,
-            rightInEar = !rightCharging && (status and (if (flipped) 0x02 else 0x08)) != 0,
+            leftInEar = !leftInCase && (status and (if (flipped) 0x08 else 0x02)) != 0,
+            rightInEar = !rightInCase && (status and (if (flipped) 0x02 else 0x08)) != 0,
+            leftInCase = leftInCase,
+            rightInCase = rightInCase,
             rssi = rssi,
             timestamp = timestamp,
         )

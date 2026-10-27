@@ -16,6 +16,8 @@ data class PodStatus(
     val caseCharging: Boolean = false,
     val leftInEar: Boolean = false,
     val rightInEar: Boolean = false,
+    val leftInCase: Boolean = false,
+    val rightInCase: Boolean = false,
     val rssi: Int = 0,
     val timestamp: Long = 0L,
 ) {

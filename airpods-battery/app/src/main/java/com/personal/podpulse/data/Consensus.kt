@@ -32,6 +32,8 @@ object Consensus {
             caseCharging = flag { it.caseCharging },
             leftInEar = flag { it.leftInEar },
             rightInEar = flag { it.rightInEar },
+            leftInCase = flag { it.leftInCase },
+            rightInCase = flag { it.rightInCase },
         )
     }
 }

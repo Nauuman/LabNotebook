@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.personal.podpulse.R
 import com.personal.podpulse.ble.ScanDiagnostics
 import com.personal.podpulse.data.AppSettings
+import com.personal.podpulse.data.ChargeEstimator
 import com.personal.podpulse.data.LastSeen
 import com.personal.podpulse.data.PodRepository
 import com.personal.podpulse.features.PairedDevice
@@ -245,6 +246,7 @@ private fun SearchingCard() {
 
 @Composable
 private fun PodsCard(status: PodStatus, now: Long) {
+    val context = LocalContext.current
     val stale = now - status.timestamp > LIVE_WINDOW_MS
     GlassCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -273,6 +275,7 @@ private fun PodsCard(status: PodStatus, now: Long) {
                     dimmed = stale,
                     modifier = Modifier.align(Alignment.Center),
                     icon = R.drawable.ic_headphones,
+                    caption = chargeCaption(context, ChargeEstimator.Part.LEFT, status.left, status.leftCharging),
                 )
             } else {
                 Column(
@@ -286,16 +289,21 @@ private fun PodsCard(status: PodStatus, now: Long) {
                         BatteryRing(
                             status.left, "Left", status.leftCharging, status.leftInEar, big, stale,
                             icon = R.drawable.ic_bud_left,
+                            inCase = status.leftInCase,
+                            caption = chargeCaption(context, ChargeEstimator.Part.LEFT, status.left, status.leftCharging),
                         )
                         BatteryRing(
                             status.right, "Right", status.rightCharging, status.rightInEar, big, stale,
                             icon = R.drawable.ic_bud_right,
+                            inCase = status.rightInCase,
+                            caption = chargeCaption(context, ChargeEstimator.Part.RIGHT, status.right, status.rightCharging),
                         )
                     }
                     Spacer(Modifier.height(8.dp))
                     BatteryRing(
                         status.case, "Case", status.caseCharging, false, big * 0.8f, stale,
                         icon = R.drawable.ic_case,
+                        caption = chargeCaption(context, ChargeEstimator.Part.CASE, status.case, status.caseCharging),
                     )
                 }
             }
@@ -681,9 +689,21 @@ private fun summary(s: PodStatus): String {
         s.leftInEar -> "Left bud in ear"
         s.rightInEar -> "Right bud in ear"
         s.leftCharging || s.rightCharging -> "Charging in case"
+        s.leftInCase && s.rightInCase -> "Both buds in case"
+        s.leftInCase || s.rightInCase -> "One bud in case"
         s.caseCharging -> "Case charging"
         else -> "Ready"
     }
+}
+
+private fun chargeCaption(
+    context: android.content.Context,
+    part: ChargeEstimator.Part,
+    level: Int?,
+    charging: Boolean,
+): String? {
+    if (!charging || level == null) return null
+    return ChargeEstimator.format(ChargeEstimator.minutesToFull(context, part, level))
 }
 
 private fun formatAge(ms: Long): String {

@@ -85,4 +85,33 @@ class AirPodsParserTest {
         assertFalse(s.leftInEar)
         assertFalse(s.rightInEar)
     }
+
+    @Test
+    fun bothInCaseFlag() {
+        // 0x24: this bud is left, both buds in case; not charging (e.g. full)
+        val s = AirPodsParser.parse(packet(0x1420, 0x24, 0xAA, 0x08), -50, 1L)!!
+        assertTrue(s.leftInCase)
+        assertTrue(s.rightInCase)
+        assertFalse(s.leftInEar)
+    }
+
+    @Test
+    fun oneInCaseFlagPicksTheRightBud() {
+        // 0x50: flipped, so this bud is the right one; one bud in case and it's this one
+        val s = AirPodsParser.parse(packet(0x1420, 0x50, 0x88, 0x08), -50, 1L)!!
+        assertTrue(s.rightInCase)
+        assertFalse(s.leftInCase)
+        val other = AirPodsParser.parse(packet(0x1420, 0x30, 0x88, 0x08), -50, 1L)!!
+        // 0x30: this bud is left and not in the case, one bud in case -> right is in case
+        assertTrue(other.rightInCase)
+        assertFalse(other.leftInCase)
+    }
+
+    @Test
+    fun chargingImpliesInCase() {
+        val s = AirPodsParser.parse(packet(0x1420, 0x20, 0x88, 0x18), -50, 1L)!!
+        assertTrue(s.leftCharging)
+        assertTrue(s.leftInCase)
+        assertFalse(s.rightInCase)
+    }
 }

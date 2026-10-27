@@ -72,6 +72,7 @@ object PodRepository {
 
         val changed = current == null || !stable.sameReadingAs(current)
         _status.value = stable
+        if (changed) ChargeEstimator.observe(context, stable)
 
         val now = stable.timestamp
         if (changed || now - lastPersist > PERSIST_INTERVAL_MS) {
@@ -94,6 +95,8 @@ object PodRepository {
             .putBoolean("caseCharging", s.caseCharging)
             .putBoolean("leftInEar", s.leftInEar)
             .putBoolean("rightInEar", s.rightInEar)
+            .putBoolean("leftInCase", s.leftInCase)
+            .putBoolean("rightInCase", s.rightInCase)
             .putInt("rssi", s.rssi)
             .putLong("timestamp", s.timestamp)
             .apply()
@@ -113,6 +116,8 @@ object PodRepository {
             caseCharging = p.getBoolean("caseCharging", false),
             leftInEar = p.getBoolean("leftInEar", false),
             rightInEar = p.getBoolean("rightInEar", false),
+            leftInCase = p.getBoolean("leftInCase", false),
+            rightInCase = p.getBoolean("rightInCase", false),
             rssi = p.getInt("rssi", 0),
             timestamp = p.getLong("timestamp", 0L),
         )

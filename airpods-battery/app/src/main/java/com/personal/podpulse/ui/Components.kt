@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -59,7 +60,11 @@ fun GlassCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
     )
 }
 
-/** A 270° gauge with a glowing arc, animated fill, and a pulse while charging. */
+/**
+ * A 270° gauge with a glowing arc and animated fill. While charging, a light
+ * orbits the ring; a part sitting in the case has its icon slowly spinning.
+ * [caption] goes underneath (e.g. the time to a full charge).
+ */
 @Composable
 fun BatteryRing(
     level: Int?,
@@ -70,8 +75,23 @@ fun BatteryRing(
     dimmed: Boolean,
     modifier: Modifier = Modifier,
     @DrawableRes icon: Int? = null,
+    inCase: Boolean = false,
+    caption: String? = null,
 ) {
     val color = levelColor(level)
+    val motion = rememberInfiniteTransition(label = "motion")
+    val spin by motion.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(3_200, easing = LinearEasing)),
+        label = "spin",
+    )
+    val orbit by motion.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(1_800, easing = LinearEasing)),
+        label = "orbit",
+    )
     val progress by animateFloatAsState(
         targetValue = (level ?: 0) / 100f,
         animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
@@ -89,8 +109,9 @@ fun BatteryRing(
         0.45f
     }
 
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
     Box(
-        modifier = modifier
+        modifier = Modifier
             .size(size)
             .alpha(if (dimmed) 0.55f else 1f),
         contentAlignment = Alignment.Center,
@@ -136,6 +157,20 @@ fun BatteryRing(
                     style = Stroke(stroke, cap = StrokeCap.Round),
                 )
             }
+            if (charging) {
+                // A light with a fading tail circling the ring.
+                for (i in 0 until 4) {
+                    drawArc(
+                        color = color.copy(alpha = 0.9f - i * 0.22f),
+                        startAngle = orbit - i * 14f,
+                        sweepAngle = 14f,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        style = Stroke(stroke * 0.55f, cap = StrokeCap.Round),
+                    )
+                }
+            }
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -144,7 +179,14 @@ fun BatteryRing(
                     painter = painterResource(icon),
                     contentDescription = null,
                     tint = TextHi.copy(alpha = 0.85f),
-                    modifier = Modifier.size(size * 0.17f),
+                    modifier = Modifier
+                        .size(size * 0.17f)
+                        .graphicsLayer {
+                            if (inCase || charging) {
+                                rotationY = spin
+                                cameraDistance = 12f * density
+                            }
+                        },
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -174,19 +216,34 @@ fun BatteryRing(
             Text(label, color = Muted, fontSize = (size.value * 0.085f).sp)
         }
 
-        if (inEar) {
+        val badge = when {
+            inEar -> "IN EAR" to Sky
+            inCase -> "IN CASE" to Muted
+            else -> null
+        }
+        if (badge != null) {
             Text(
-                text = "IN EAR",
+                text = badge.first,
                 color = Bg0,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .background(Sky, RoundedCornerShape(50))
+                    .background(badge.second, RoundedCornerShape(50))
                     .padding(horizontal = 8.dp, vertical = 2.dp),
             )
         }
+    }
+    if (caption != null) {
+        Text(
+            caption,
+            color = if (charging) color else Muted,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+    }
     }
 }
 

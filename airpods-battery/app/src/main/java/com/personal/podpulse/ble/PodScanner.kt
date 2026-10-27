@@ -129,7 +129,8 @@ object PodScanner {
             data,
             result.rssi,
             status?.let { "L ${it.left ?: "-"} R ${it.right ?: "-"} C ${it.case ?: "-"} " +
-                "ear ${if (it.leftInEar) "L" else ""}${if (it.rightInEar) "R" else ""}" },
+                "ear ${if (it.leftInEar) "L" else ""}${if (it.rightInEar) "R" else ""} " +
+                "case ${if (it.leftInCase) "L" else ""}${if (it.rightInCase) "R" else ""}" },
         )
         if (status == null) return false
         FindSignal.offer(status)
