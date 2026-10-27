@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
@@ -33,7 +34,7 @@ object CasePopup {
     private const val SILENCE_MS = 45_000L
     private const val COOLDOWN_MS = 60_000L
     private const val NEAR_RSSI = -75
-    private const val SHOW_MS = 7_000L
+    private const val SHOW_MS = 10_000L
 
     private val main = Handler(Looper.getMainLooper())
     private var lastHeard = 0L
@@ -83,14 +84,25 @@ object CasePopup {
             setViewTreeLifecycleOwner(overlayOwner)
             setViewTreeSavedStateRegistryOwner(overlayOwner)
             setContent { PodPulseTheme { CasePopupCard(onDismiss = { dismiss(context) }) } }
+            // Like iOS, tapping anywhere outside the card closes it.
+            setOnTouchListener { _, event ->
+                if (event.action == MotionEvent.ACTION_OUTSIDE) dismiss(context)
+                false
+            }
         }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                WindowManager.LayoutParams.FLAG_DIM_BEHIND,
             PixelFormat.TRANSLUCENT,
-        ).apply { gravity = Gravity.BOTTOM }
+        ).apply {
+            gravity = Gravity.BOTTOM
+            dimAmount = 0.3f
+        }
 
         overlayOwner.resume()
         val added = runCatching { wm.addView(composeView, params) }.isSuccess
