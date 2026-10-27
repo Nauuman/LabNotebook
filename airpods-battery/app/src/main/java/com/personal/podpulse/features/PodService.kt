@@ -18,7 +18,6 @@ import com.personal.podpulse.ble.Permissions
 import com.personal.podpulse.ble.PodScanner
 import com.personal.podpulse.data.AppSettings
 import com.personal.podpulse.data.PodRepository
-import com.personal.podpulse.ui.PopupActivity
 import com.personal.podpulse.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,8 +27,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Runs only while my AirPods are connected. Scans at full speed so ear
- * detection reacts quickly, shows the case pop-up, and keeps an ongoing
- * battery notification.
+ * detection reacts quickly, and keeps an ongoing battery notification.
  */
 class PodService : Service() {
 
@@ -87,17 +85,12 @@ class PodService : Service() {
     }
 
     private fun observe() {
-        val startedAt = System.currentTimeMillis()
         var previous = PodRepository.status.value
         scope.launch {
             PodRepository.status.collect { s ->
                 if (s == null) return@collect
                 val prev = previous
                 previous = s
-
-                // A fresh reading after a gap means the case was just opened / buds connected.
-                val gap = prev == null || s.timestamp - prev.timestamp > POPUP_GAP_MS
-                if (gap && s.timestamp >= startedAt) showPopup()
 
                 if (prev == null || !s.sameReadingAs(prev)) Alerts.updateLive(this@PodService, s)
 
@@ -115,25 +108,6 @@ class PodService : Service() {
         }
     }
 
-    private var lastPopup = 0L
-
-    private fun showPopup() {
-        if (!AppSettings.flag(this, AppSettings.CASE_POPUP) || MainActivity.isVisible) return
-        val now = System.currentTimeMillis()
-        if (now - lastPopup < POPUP_COOLDOWN_MS) return
-        lastPopup = now
-        val status = PodRepository.status.value ?: return
-        if (Settings.canDrawOverlays(this)) {
-            val launched = runCatching {
-                startActivity(
-                    Intent(this, PopupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
-            }.isSuccess
-            if (launched) return
-        }
-        Alerts.showConnected(this, status)
-    }
-
     private fun sendMediaKey(code: Int) {
         audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
         audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
@@ -147,8 +121,6 @@ class PodService : Service() {
     }
 
     companion object {
-        private const val POPUP_GAP_MS = 30_000L
-        private const val POPUP_COOLDOWN_MS = 2 * 60_000L
 
         /** The live instance once it's safely in the foreground. */
         @Volatile
@@ -157,10 +129,8 @@ class PodService : Service() {
         @Volatile
         private var stopRequested = false
 
-        /** Only worth running when a feature that needs fast updates is on. */
-        fun needed(context: Context): Boolean =
-            AppSettings.flag(context, AppSettings.AUTO_PAUSE) ||
-                AppSettings.flag(context, AppSettings.CASE_POPUP)
+        /** Only worth running when auto-pause (which needs fast updates) is on. */
+        fun needed(context: Context): Boolean = AppSettings.flag(context, AppSettings.AUTO_PAUSE)
 
         fun start(context: Context) {
             // Android 14 refuses a connectedDevice service without Bluetooth permission,

@@ -23,7 +23,7 @@ No pairing hacks, no account, no internet: nothing leaves your phone.
 - **Last seen:** when your AirPods disconnect, the phone's location is saved,
   with Open in Maps / Directions buttons.
 - **Auto-pause:** take a bud out and music pauses; put it back and it resumes.
-- **Connection pop-up:** an iPhone-style battery card when the AirPods connect
+- **Case pop-up:** an iPhone-style battery card when you open the case
   (needs "Display over other apps", otherwise shown as a notification).
 - **Low battery alert:** a notification when a bud drops to 20 %.
 - **Battery notification:** an ongoing notification while connected.

@@ -15,6 +15,7 @@ import android.os.Build
 import com.personal.podpulse.data.AirPodsParser
 import com.personal.podpulse.data.PodRepository
 import com.personal.podpulse.features.Alerts
+import com.personal.podpulse.features.CasePopup
 import com.personal.podpulse.features.FindSignal
 
 /**
@@ -99,7 +100,7 @@ object PodScanner {
         val intent = backgroundIntent(context)
         runCatching { scanner.stopScan(intent) }
         return runCatching {
-            scanner.startScan(filters(), settings(ScanSettings.SCAN_MODE_LOW_POWER), intent) == 0
+            scanner.startScan(filters(), settings(ScanSettings.SCAN_MODE_BALANCED), intent) == 0
         }.getOrDefault(false)
     }
 
@@ -132,6 +133,7 @@ object PodScanner {
         )
         if (status == null) return false
         FindSignal.offer(status)
+        CasePopup.onPacket(context, status)
         if (!PodRepository.submit(context, status)) return false
         // Alert on the smoothed reading, never on a single packet.
         PodRepository.status.value?.let { Alerts.checkLowBattery(context, it) }

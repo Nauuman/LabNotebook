@@ -469,7 +469,7 @@ private fun FeaturesCard(env: EnvState, actions: ScreenActions) {
         FeatureSwitch(
             env, actions, AppSettings.CASE_POPUP,
             "Connection pop-up",
-            "Shows battery when your AirPods connect, like on an iPhone.",
+            "Shows battery when you open the case, like on an iPhone.",
         )
         if (env.flags[AppSettings.CASE_POPUP] == true && !env.canDrawOverlays) {
             Hint(
