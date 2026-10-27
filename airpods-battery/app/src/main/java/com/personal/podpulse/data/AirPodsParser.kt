@@ -20,9 +20,12 @@ object AirPodsParser {
     const val APPLE_COMPANY_ID = 0x004C
     const val PROXIMITY_PAIRING = 0x07
 
+    /** The battery message's length byte. Other 0x07 messages use a different layout. */
+    private const val BATTERY_MESSAGE_LENGTH = 0x19
+
     fun parse(data: ByteArray?, rssi: Int, timestamp: Long): PodStatus? {
         if (data == null || data.size < 10) return null
-        if (data[0].u() != PROXIMITY_PAIRING) return null
+        if (data[0].u() != PROXIMITY_PAIRING || data[1].u() != BATTERY_MESSAGE_LENGTH) return null
 
         val modelId = (data[3].u() shl 8) or data[4].u()
         val status = data[5].u()
@@ -50,16 +53,21 @@ object AirPodsParser {
         val case = level(flags and 0x0F)
         if (left == null && right == null && case == null) return null
 
-        val leftCharging = (charging and (if (flipped) 0x02 else 0x01)) != 0
-        val rightCharging = (charging and (if (flipped) 0x01 else 0x02)) != 0
+        val leftInEar = (status and (if (flipped) 0x08 else 0x02)) != 0
+        val rightInEar = (status and (if (flipped) 0x02 else 0x08)) != 0
 
-        // A charging bud is always in the case, whatever the flags say.
+        // A bud in your ear can't be charging or in the case: that flag wins.
+        // Otherwise a charging bud is always in the case.
+        val leftCharging = !leftInEar && (charging and (if (flipped) 0x02 else 0x01)) != 0
+        val rightCharging = !rightInEar && (charging and (if (flipped) 0x01 else 0x02)) != 0
         val thisIsLeft = !flipped
         val thisInCase = (status and 0x40) != 0
         val bothInCase = (status and 0x04) != 0
         val oneInCase = (status and 0x10) != 0
-        val leftInCase = leftCharging || bothInCase || (oneInCase && thisInCase == thisIsLeft)
-        val rightInCase = rightCharging || bothInCase || (oneInCase && thisInCase != thisIsLeft)
+        val leftInCase = !leftInEar &&
+            (leftCharging || bothInCase || (oneInCase && thisInCase == thisIsLeft))
+        val rightInCase = !rightInEar &&
+            (rightCharging || bothInCase || (oneInCase && thisInCase != thisIsLeft))
         return PodStatus(
             modelId = modelId,
             left = left,
@@ -68,8 +76,8 @@ object AirPodsParser {
             leftCharging = leftCharging,
             rightCharging = rightCharging,
             caseCharging = (charging and 0x04) != 0,
-            leftInEar = !leftInCase && (status and (if (flipped) 0x08 else 0x02)) != 0,
-            rightInEar = !rightInCase && (status and (if (flipped) 0x02 else 0x08)) != 0,
+            leftInEar = leftInEar,
+            rightInEar = rightInEar,
             leftInCase = leftInCase,
             rightInCase = rightInCase,
             rssi = rssi,

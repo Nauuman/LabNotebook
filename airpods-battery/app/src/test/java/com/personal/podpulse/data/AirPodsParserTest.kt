@@ -77,13 +77,22 @@ class AirPodsParserTest {
     }
 
     @Test
-    fun chargingBudIsNeverInEar() {
-        // not flipped; in-ear flags set for both, but left (0x01) and right (0x02) charging
-        val s = AirPodsParser.parse(packet(0x1420, 0x2B, 0x99, 0x35), -50, 1L)!!
+    fun budInEarIsNeverCharging() {
+        // not flipped; left (0x01) and right (0x02) charging flags, but only the
+        // right bud (0x08) reports being in an ear: like left in case, right worn
+        val s = AirPodsParser.parse(packet(0x1420, 0x28, 0x93, 0x35), -50, 1L)!!
         assertTrue(s.leftCharging)
-        assertTrue(s.rightCharging)
+        assertTrue(s.leftInCase)
         assertFalse(s.leftInEar)
-        assertFalse(s.rightInEar)
+        assertTrue(s.rightInEar)
+        assertFalse(s.rightCharging)
+        assertFalse(s.rightInCase)
+    }
+
+    @Test
+    fun ignoresOtherProximityMessages() {
+        val other = packet(0x1420, 0x20, 0x99, 0x35).also { it[1] = 0x11 }
+        assertNull(AirPodsParser.parse(other, -50, 1L))
     }
 
     @Test
