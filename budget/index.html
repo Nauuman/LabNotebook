@@ -12,6 +12,7 @@
   --line: #d7ddd5; --accent: #1d6b50; --accent-ink: #ffffff; --accent-soft: #d9eae1;
   --good: #1c7a3d; --warn: #9a5c00; --bad: #b3261e; --good-soft: #dcefe2; --warn-soft: #f6ead3; --bad-soft: #f7dedb;
   --s1: #2a78d6; --s2: #eb6834; --s3: #8b958f;
+  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; --c5: #e87ba4;
   --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -21,12 +22,12 @@
   --bg: #0f1412; --surface: #161d19; --surface-2: #1d2621; --ink: #e6ede8; --ink-2: #b3bfb8; --muted: #8b978f;
   --line: #2b3530; --accent: #5cc79a; --accent-ink: #0a1a12; --accent-soft: #1b3a2c;
   --good: #63cc86; --warn: #e2a640; --bad: #f2756b; --good-soft: #183323; --warn-soft: #3a2c12; --bad-soft: #3d1c1a;
-  --s1: #3987e5; --s2: #d95926; --s3: #6f7a74; color-scheme: dark; } }
+  --s1: #3987e5; --s2: #d95926; --s3: #6f7a74; --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #0f1412; --surface: #161d19; --surface-2: #1d2621; --ink: #e6ede8; --ink-2: #b3bfb8; --muted: #8b978f;
   --line: #2b3530; --accent: #5cc79a; --accent-ink: #0a1a12; --accent-soft: #1b3a2c;
   --good: #63cc86; --warn: #e2a640; --bad: #f2756b; --good-soft: #183323; --warn-soft: #3a2c12; --bad-soft: #3d1c1a;
-  --s1: #3987e5; --s2: #d95926; --s3: #6f7a74; color-scheme: dark; }
+  --s1: #3987e5; --s2: #d95926; --s3: #6f7a74; --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; color-scheme: dark; }
 
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
@@ -148,6 +149,14 @@ tr.clickable:hover td { background: var(--surface-2); }
 .payday { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; min-width: 120px; display: grid; gap: 2px; }
 .payday .d { font-family: var(--display); font-weight: 700; }
 
+.stack { display: flex; gap: 2px; height: 22px; border-radius: 0 4px 4px 0; overflow: hidden; background: var(--surface-2); }
+.stack i { display: block; min-width: 3px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
+table.heat td { border-bottom-color: var(--surface); }
+table.heat tr.tot td { border-top: 2px solid var(--ink); font-weight: 500; }
+.sync-box { display: grid; gap: 10px; }
+.sync-box ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.status-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .empty { padding: 18px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: var(--r); }
 .empty button { margin-top: 8px; }
 
@@ -221,6 +230,8 @@ function money(n, dec = 2) {
 }
 const m0 = n => money(n, 0);
 
+const WEBSITE_URL = 'https://nauuman.github.io/LabNotebook/';
+const APK_URL = 'https://github.com/Nauuman/LabNotebook/releases/latest';
 const FREQ = { weekly: { label: 'Weekly', perMonth: 52 / 12 }, biweekly: { label: 'Every 2 weeks', perMonth: 26 / 12 }, semimonthly: { label: 'Twice a month (15th & last day)', perMonth: 2 }, monthly: { label: 'Monthly', perMonth: 1 } };
 const CARD_KINDS = ['Cashback', 'Travel rewards', 'Points', 'Store card', 'Balance transfer', 'Secured', 'Business', 'Other'];
 const ACCT_KINDS = ['Savings', 'High-yield savings', 'Checking', 'Money market', 'Cash', 'Other'];
@@ -244,7 +255,7 @@ function blankState() {
     ['Other', ['Gifts', 'Misc']]
   ].map(([name, items]) => ({ id: uid(), name, items: items.map(label => ({ id: uid(), label, note: '' })) }));
   return { version: 1, example: false, settings: { currency: 'USD', bufferMonths: 3, strategy: 'avalanche', debtBudgetOverride: null },
-    categories: cats, expenses: [], cards: [], accounts: [], pay: [], payables: [], goals: [], carry: { amount: 0, history: [] } };
+    categories: cats, expenses: [], cards: [], accounts: [], pay: [], payables: [], goals: [], carry: { amount: 0, history: [] }, deleted: {} };
 }
 
 function exampleState() {
@@ -310,6 +321,7 @@ function normalize(s) {
   ['categories', 'expenses', 'cards', 'accounts', 'pay', 'payables', 'goals'].forEach(k => { if (!Array.isArray(s[k])) s[k] = []; });
   s.categories.forEach(c => { if (!Array.isArray(c.items)) c.items = []; });
   s.payables.forEach(p => { if (!Array.isArray(p.paidMonths)) p.paidMonths = []; });
+  if (!s.deleted || typeof s.deleted !== 'object' || Array.isArray(s.deleted)) s.deleted = {};
   return s;
 }
 
@@ -345,7 +357,10 @@ async function initStore() {
   }
   S = loaded ? normalize(loaded) : exampleState();
   if (!loaded) S.example = true;
-  setSaveState(S.example ? 'Showing examples' : (store.kind === 'cloud' ? 'Saved to your account' : 'Saved on this device'));
+  takeSnapshot();
+  showStatus();
+  if (syncOn() && S.example) disconnectSync();
+  queueSync(200);
 }
 
 function setSaveState(t) { $('#save-state').textContent = t; }
@@ -354,6 +369,7 @@ function commit(opts = {}) {
   // call after any change; months = expense months touched
   if (S.example) { S.example = false; allExpenseMonths().forEach(m => dirtyMonths.add(m)); }
   (opts.months || []).forEach(m => dirtyMonths.add(m));
+  stamp();
   mainDirty = true;
   render();
   clearTimeout(saveTimer);
@@ -376,7 +392,8 @@ async function flush() {
     } else {
       localStorage.setItem(LS_KEY, JSON.stringify(S));
       mainDirty = false; dirtyMonths.clear();
-      setSaveState('Saved on this device');
+      showStatus();
+      queueSync();
     }
   } catch (e) {
     console.error(e);
@@ -385,6 +402,178 @@ async function flush() {
   }
 }
 const allExpenseMonths = () => [...new Set(S.expenses.map(e => e.date.slice(0, 7)))];
+
+// ---------- change tracking & merge ----------
+// Every record carries `u` (last-changed time). Deleted ids go into S.deleted with the time they were removed,
+// so two devices can merge their copies record by record instead of one overwriting the other.
+const COLS = ['categories', 'expenses', 'cards', 'accounts', 'pay', 'payables', 'goals'];
+let snapshot = null;
+const bodyOf = r => { const { u, ...rest } = r || {}; return JSON.stringify(rest); };
+function takeSnapshot() {
+  snapshot = { settings: bodyOf(S.settings), carry: bodyOf(S.carry) };
+  COLS.forEach(c => { snapshot[c] = new Map(S[c].map(r => [r.id, bodyOf(r)])); });
+}
+function stamp() {
+  if (!snapshot) { takeSnapshot(); return; }
+  const now = Date.now();
+  COLS.forEach(c => {
+    const seen = new Set();
+    S[c].forEach(r => { seen.add(r.id); if (snapshot[c].get(r.id) !== bodyOf(r)) r.u = now; });
+    snapshot[c].forEach((_, id) => { if (!seen.has(id)) S.deleted[id] = now; });
+  });
+  if (snapshot.settings !== bodyOf(S.settings)) S.settings.u = now;
+  if (snapshot.carry !== bodyOf(S.carry)) S.carry.u = now;
+  takeSnapshot();
+}
+function mergeStates(a, b) {
+  const out = normalize(JSON.parse(JSON.stringify(a)));
+  const del = { ...a.deleted };
+  Object.entries(b.deleted || {}).forEach(([id, t]) => { if (!(del[id] >= t)) del[id] = t; });
+  const cutoff = Date.now() - 180 * 864e5;
+  Object.keys(del).forEach(id => { if (del[id] < cutoff) delete del[id]; });
+  COLS.forEach(c => {
+    const map = new Map();
+    [...a[c], ...(b[c] || [])].forEach(r => { const cur = map.get(r.id); if (!cur || (r.u || 0) > (cur.u || 0)) map.set(r.id, r); });
+    out[c] = JSON.parse(JSON.stringify([...map.values()].filter(r => !(del[r.id] >= (r.u || 0)))));
+  });
+  if ((b.settings.u || 0) > (a.settings.u || 0)) out.settings = { ...b.settings };
+  if ((b.carry.u || 0) > (a.carry.u || 0)) out.carry = JSON.parse(JSON.stringify(b.carry));
+  out.deleted = del; out.example = false;
+  return out;
+}
+function canon(s) {
+  const byId = (x, y) => (x.id < y.id ? -1 : 1);
+  return JSON.stringify([COLS.map(c => [...s[c]].sort(byId)), s.settings, s.carry, Object.keys(s.deleted).sort().map(k => [k, s.deleted[k]])]);
+}
+
+// ---------- sync between devices (encrypted file in a secret GitHub gist) ----------
+const SYNC_KEY = 'paycheck-ledger-sync-v1', GIST_FILE = 'paycheck-ledger.sync';
+let sync = null;
+try { sync = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null'); } catch {}
+let syncBusy = false, syncAgain = false, syncTimer = null, lastSyncAt = 0, syncError = '';
+const syncOn = () => !!(sync && sync.gistId && store.kind === 'local');
+
+const b64 = buf => { const a = new Uint8Array(buf); let s = ''; for (let i = 0; i < a.length; i += 8192) s += String.fromCharCode.apply(null, a.subarray(i, i + 8192)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const keyCache = new Map();
+let syncSalt = null;
+async function deriveKey(pass, salt) {
+  const k = pass + '|' + b64(salt);
+  if (!keyCache.has(k)) {
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+    keyCache.set(k, await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
+  }
+  return keyCache.get(k);
+}
+async function encryptState(state, pass) {
+  if (!syncSalt) syncSalt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await deriveKey(pass, syncSalt), new TextEncoder().encode(JSON.stringify(state)));
+  return JSON.stringify({ app: 'paycheck-ledger', v: 1, salt: b64(syncSalt), iv: b64(iv), data: b64(ct) });
+}
+async function decryptState(text, pass) {
+  const env = JSON.parse(text);
+  if (env.app !== 'paycheck-ledger') throw Object.assign(new Error('format'), { code: 'format' });
+  const salt = unb64(env.salt);
+  let plain;
+  try { plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(env.iv) }, await deriveKey(pass, salt), unb64(env.data)); }
+  catch { throw Object.assign(new Error('passphrase'), { code: 'passphrase' }); }
+  syncSalt = salt;
+  return normalize(JSON.parse(new TextDecoder().decode(plain)));
+}
+async function gh(cfg, path, opts = {}) {
+  const res = await fetch('https://api.github.com' + path, { ...opts, cache: 'no-store', headers: { Authorization: 'Bearer ' + cfg.token, Accept: 'application/vnd.github+json', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
+  if (!res.ok) throw Object.assign(new Error('GitHub ' + res.status), { status: res.status });
+  return res.json();
+}
+async function readRemote(cfg) {
+  const g = await gh(cfg, '/gists/' + cfg.gistId);
+  const f = g.files && g.files[GIST_FILE];
+  if (!f) return null;
+  const text = f.truncated ? await (await fetch(f.raw_url, { cache: 'no-store' })).text() : f.content;
+  return text ? decryptState(text, cfg.pass) : null;
+}
+async function writeRemote(cfg, state) {
+  const content = await encryptState(state, cfg.pass);
+  await gh(cfg, '/gists/' + cfg.gistId, { method: 'PATCH', body: JSON.stringify({ files: { [GIST_FILE]: { content } } }) });
+}
+function syncMessage(e) {
+  if (!navigator.onLine) return 'Offline. Changes will sync when you are back online.';
+  if (e.code === 'passphrase') return 'The sync passphrase does not match the one used on your other device.';
+  if (e.status === 401) return 'GitHub no longer accepts the sync token. Create a new one and reconnect.';
+  if (e.status === 404) return 'The sync file was not found. Reconnect sync to create a new one.';
+  if (e.status === 403 || e.status === 429) return 'GitHub is limiting requests. Sync will retry in a minute.';
+  return 'Could not reach GitHub. Sync will retry shortly.';
+}
+function showStatus() {
+  if (S.example) return setSaveState('Showing examples');
+  if (store.kind === 'cloud') return setSaveState('Saved to your account');
+  if (!syncOn()) return setSaveState('Saved on this device');
+  if (syncBusy) return setSaveState('Syncing…');
+  if (syncError) return setSaveState('Sync paused');
+  if (!lastSyncAt) return setSaveState('Saved · not synced yet');
+  const mins = Math.round((Date.now() - lastSyncAt) / 60000);
+  setSaveState(mins < 1 ? 'Synced just now' : `Synced ${mins} min ago`);
+}
+function queueSync(delay = 1500) { if (!syncOn()) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, delay); }
+async function syncNow() {
+  if (!syncOn() || S.example) return;
+  if (syncBusy) { syncAgain = true; return; }
+  syncBusy = true; showStatus();
+  const cfg = sync;
+  try {
+    const remote = await readRemote(cfg);
+    if (cfg !== sync) return;
+    // merge with whatever S is now, so edits made while the request was in flight are kept
+    const merged = remote ? mergeStates(S, remote) : S;
+    if (canon(merged) !== canon(S)) {
+      S = merged; takeSnapshot();
+      try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {}
+      if (!$('.scrim')) render();
+    }
+    if (!remote || canon(merged) !== canon(remote)) await writeRemote(cfg, S);
+    lastSyncAt = Date.now(); syncError = '';
+  } catch (e) {
+    console.warn('Sync failed', e);
+    syncError = syncMessage(e);
+  } finally {
+    syncBusy = false; showStatus();
+    if (view.tab === 'prefs' && !$('.scrim') && !(document.activeElement && document.activeElement.closest('form[data-form="sync"]'))) render();
+    if (syncAgain) { syncAgain = false; queueSync(300); }
+  }
+}
+async function connectSync(token, pass) {
+  const cfg = { token, pass, gistId: null };
+  let gistId = null;
+  for (let page = 1; page <= 5 && !gistId; page++) {
+    const list = await gh(cfg, `/gists?per_page=100&page=${page}`);
+    const hit = list.find(g => g.files && g.files[GIST_FILE]);
+    if (hit) gistId = hit.id;
+    if (list.length < 100) break;
+  }
+  if (gistId) {
+    cfg.gistId = gistId;
+    const remote = await readRemote(cfg);
+    if (remote) S = S.example ? remote : mergeStates(S, remote);
+  } else {
+    let first = S;
+    if (S.example) { first = blankState(); first.settings.currency = S.settings.currency; }
+    syncSalt = null;
+    const g = await gh(cfg, '/gists', { method: 'POST', body: JSON.stringify({ description: 'Paycheck Ledger sync (encrypted)', public: false, files: { [GIST_FILE]: { content: await encryptState(first, pass) } } }) });
+    cfg.gistId = g.id;
+    S = first;
+  }
+  S.example = false;
+  sync = cfg;
+  try { localStorage.setItem(SYNC_KEY, JSON.stringify(sync)); localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {}
+  takeSnapshot();
+  await syncNow();
+  return !gistId;
+}
+function disconnectSync() { sync = null; syncError = ''; lastSyncAt = 0; try { localStorage.removeItem(SYNC_KEY); } catch {} showStatus(); }
+setInterval(() => { if (document.visibilityState === 'visible') syncNow(); }, 45000);
+setInterval(() => { if (!syncBusy) showStatus(); }, 30000);
+window.addEventListener('online', () => queueSync(500));
 
 // ---------- domain calculations ----------
 const catById = id => S.categories.find(c => c.id === id);
@@ -579,7 +768,7 @@ function topCategories(mk, inclBills) {
 }
 
 // ---------- rendering ----------
-const TABS = [['overview', 'Overview'], ['spending', 'Spending'], ['cards', 'Cards & payoff'], ['income', 'Pay & bills'], ['savings', 'Savings & goals'], ['categories', 'Categories'], ['prefs', 'Settings']];
+const TABS = [['overview', 'Overview'], ['breakdowns', 'Breakdowns'], ['spending', 'Spending'], ['cards', 'Cards & payoff'], ['income', 'Pay & bills'], ['savings', 'Savings & goals'], ['categories', 'Categories'], ['prefs', 'Settings']];
 
 function render() {
   if (!S) return;
@@ -588,7 +777,7 @@ function render() {
   $('#month-label').textContent = parse(view.month + '-01').toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   $('#today-stamp').textContent = 'Today ' + fmtDate(today(), { weekday: 'short', month: 'short', day: 'numeric' });
   const banner = S.example ? `<div class="banner" role="status"><p><b>These are example numbers</b>, not yours. Look around, then start fresh, or edit the examples and they become yours.</p><button class="primary" data-action="start-fresh">Start with my own numbers</button><button data-action="keep-examples">Keep examples and edit</button></div>` : '';
-  const views = { overview: vOverview, spending: vSpending, cards: vCards, income: vIncome, savings: vSavings, categories: vCategories, prefs: vSettings };
+  const views = { overview: vOverview, breakdowns: vBreakdowns, spending: vSpending, cards: vCards, income: vIncome, savings: vSavings, categories: vCategories, prefs: vSettings };
   $('#view').innerHTML = banner + views[view.tab]();
   document.querySelectorAll('.chart[data-chart]').forEach(drawChart);
 }
@@ -641,7 +830,7 @@ function vOverview() {
       <p class="small muted" style="margin:0">Planned card payments follow your ${plan.strategy} plan on the Cards tab. Spending counts what you've logged for this month.</p>
     </section>
     <section class="panel">
-      <div class="panel-head"><h2>Biggest costs</h2><button class="ghost" data-action="tab" data-id="spending">Full breakdown →</button></div>
+      <div class="panel-head"><h2>Biggest costs</h2><button class="ghost" data-action="tab" data-id="breakdowns">All breakdowns →</button></div>
       ${top.length ? `<div class="bars">${top.map(c => `<div class="bar-row" style="cursor:default"><span>${esc(c.name)}</span><span class="bar-track"><span class="bar-fill" style="width:${(c.total / maxTop * 100).toFixed(1)}%"></span></span><span class="bar-val">${m0(c.total)}</span></div>`).join('')}</div>` : emptyBox('No spending or bills for this month yet.', 'add-expense', 'Log an expense')}
     </section>
   </div>
@@ -815,6 +1004,33 @@ function vCategories() {
   </div>`).join('')}</div></section>`;
 }
 
+function vSyncPanel() {
+  if (store.kind !== 'local') return '';
+  const here = window.AndroidBridge ? 'the website' : 'the Android app';
+  const links = `<p class="small muted" style="margin:0">Website: <a href="${WEBSITE_URL}" target="_blank" rel="noopener">${WEBSITE_URL.replace('https://', '')}</a> · Android app: <a href="${APK_URL}" target="_blank" rel="noopener">download the APK</a></p>`;
+  if (syncOn()) {
+    return `<section class="panel sync-box"><div class="panel-head"><h2>Sync</h2><span class="chip ${syncError ? 'warn' : 'good'}">${syncError ? 'Paused' : 'On'}</span></div>
+      <div class="status-line"><span>${syncError ? esc(syncError) : lastSyncAt ? `Last synced ${fmtDate(new Date(lastSyncAt), { hour: 'numeric', minute: '2-digit' })}. Changes sync a few seconds after you make them, and every time you open the app.` : 'Waiting for the first sync…'}</span></div>
+      <div class="panel-head"><span class="small muted" style="margin-right:auto">To sync another device, open Settings there and connect with the same GitHub token and passphrase.</span><button data-action="sync-now">Sync now</button><button class="danger" data-action="sync-off">Turn off sync on this device</button></div>
+      ${links}</section>`;
+  }
+  return `<section class="panel sync-box"><h2>Sync with ${here}</h2>
+    <p style="margin:0">Keep this device and ${here} showing the same budget. Your data is encrypted with your passphrase, then stored in a private file (a secret gist) on your GitHub account. GitHub cannot read it.</p>
+    <ol class="small">
+      <li><a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=Paycheck%20Ledger%20sync" target="_blank" rel="noopener">Create a GitHub token</a> with only the <b>gist</b> box ticked. Set the expiration to "No expiration" (or remember to renew it), then copy the token.</li>
+      <li>Paste it below, choose a passphrase, and tap Connect.</li>
+      <li>Do the same on your other device with the same token and passphrase.</li>
+    </ol>
+    <form class="inline-form" data-form="sync" autocomplete="off">
+      <div class="field"><label for="sync-token">GitHub token</label><input id="sync-token" name="token" type="password" placeholder="ghp_…" required></div>
+      <div class="field"><label for="sync-pass">Passphrase</label><input id="sync-pass" name="pass" type="password" minlength="8" placeholder="At least 8 characters" required></div>
+      <button type="submit" class="primary">Connect</button>
+    </form>
+    <div class="err" id="sync-err" hidden></div>
+    <p class="small muted" style="margin:0">${S.example ? 'You are looking at example numbers. Connecting loads your synced budget, or starts a blank one if nothing has been synced yet.' : 'If a synced budget already exists, it is merged with what is on this device. Nothing is lost.'} If you forget the passphrase, the synced copy cannot be opened, so write it down.</p>
+    ${links}</section>`;
+}
+
 function vSettings() {
   return `<section class="panel"><h2>Settings</h2>
     <form class="inline-form" data-form="settings">
@@ -825,6 +1041,7 @@ function vSettings() {
     </form>
     <p class="small muted" style="margin:0">${store.kind === 'cloud' ? 'Your budget is saved to your Claude account and only you can see it.' : window.AndroidBridge ? 'Your budget is saved on this phone only. Export a backup regularly, and before uninstalling the app or changing phones.' : 'Your budget is saved in this browser only. Export a backup to move it to another device.'}</p>
   </section>
+  ${vSyncPanel()}
   <section class="panel"><h2>Backup</h2>
     <div class="panel-head"><span class="muted small" style="margin-right:auto">Export everything as a JSON file, or restore from one.</span><button data-action="export">Export backup</button><button data-action="import">Import backup</button></div>
   </section>
@@ -832,7 +1049,140 @@ function vSettings() {
 }
 
 // ---------- chart ----------
+function vBreakdowns() {
+  const mk = view.month;
+  const plan = buildPlan();
+  const monthLabel = $('#month-label').textContent;
+  const inc = incomeInMonth(mk);
+  const billsList = payablesInMonth(mk);
+  const bills = sum(billsList, x => x.p.amount);
+  const exps = expensesInMonth(mk);
+  const spent = sum(exps, e => e.amount);
+  const cardPay = plan.cards.length ? sum(Object.values(plan.run.first)) : 0;
+  const saving = plan.goals + plan.savingsSetAside;
+  const out = bills + spent + cardPay + saving;
+  const left = inc - out;
+  const segs = [['Payables', bills, 'var(--c1)'], ['Spending', spent, 'var(--c2)'], ['Card payments', cardPay, 'var(--c3)'], ['Goals & cushion', saving, 'var(--c4)'], ['Left over', Math.max(0, left), 'var(--c5)']];
+  const base = Math.max(inc, out) || 1;
+  const pct = v => inc > 0 ? (v / inc * 100).toFixed(0) + '%' : '—';
+
+  // category x month grid (spending + bills), last 6 months ending at the selected month
+  const months = [5, 4, 3, 2, 1, 0].map(n => mkey(addMonths(parse(mk + '-01'), -n)));
+  const grid = new Map();
+  months.forEach((m, i) => topCategories(m, true).forEach(c => {
+    if (!grid.has(c.id)) grid.set(c.id, { name: c.name, vals: months.map(() => 0) });
+    grid.get(c.id).vals[i] = c.total;
+  }));
+  const rows = [...grid.values()].sort((a, b) => b.vals[5] - a.vals[5] || sum(b.vals) - sum(a.vals));
+  const cellMax = Math.max(1, ...rows.flatMap(r => r.vals));
+  const colTotals = months.map((_, i) => sum(rows, r => r.vals[i]));
+  const mLabel = m => parse(m + '-01').toLocaleDateString(undefined, { month: 'short' });
+
+  // weeks of the month
+  const [a, b] = monthRange(mk);
+  const weeks = [];
+  for (let d = 1; d <= b.getDate(); d += 7) {
+    const end = Math.min(d + 6, b.getDate());
+    const items = exps.filter(e => { const day = +e.date.slice(8, 10); return day >= d && day <= end; });
+    const billsW = billsList.filter(x => x.date.getDate() >= d && x.date.getDate() <= end);
+    weeks.push({ label: `${fmtDate(new Date(a.getFullYear(), a.getMonth(), d))} – ${fmtDate(new Date(a.getFullYear(), a.getMonth(), end))}`, spent: sum(items, e => e.amount), bills: sum(billsW, x => x.p.amount), n: items.length });
+  }
+  const weekMax = Math.max(1, ...weeks.map(w => w.spent + w.bills));
+
+  // pay by source
+  const paySrc = (() => { const m = new Map(); paydaysBetween(a, b).forEach(p => { const r = m.get(p.id) || { source: p.source, total: 0, n: 0 }; r.total += p.amount; r.n++; m.set(p.id, r); }); return [...m.values()].sort((x, y) => y.total - x.total); })();
+
+  // cards
+  const debt = sum(S.cards, c => c.balance);
+  const cardRows = S.cards.map(c => {
+    const charged = exps.filter(e => e.payWith === c.id);
+    const byCat = new Map(); charged.forEach(e => byCat.set(catName(e.catId), (byCat.get(catName(e.catId)) || 0) + e.amount));
+    const top = [...byCat.entries()].sort((x, y) => y[1] - x[1])[0];
+    return { c, share: debt ? c.balance / debt : 0, interest: c.balance * (+c.apr || 0) / 100 / 12, charged: sum(charged, e => e.amount), top };
+  }).sort((x, y) => y.c.balance - x.c.balance);
+  const interestTotal = sum(cardRows, r => r.interest);
+
+  // accounts
+  const savingsTotal = sum(S.accounts, x => x.balance);
+
+  return `
+  <section class="panel">
+    <div class="panel-head"><h2>Where ${esc(monthLabel)}'s pay goes</h2>${left < 0 ? `<span class="chip bad">Short by ${m0(-left)}</span>` : `<span class="chip good">${m0(left)} left over</span>`}</div>
+    <div class="stack" role="img" aria-label="Pay split into payables, spending, card payments, goals and left over">${segs.filter(s => s[1] > 0).map(s => `<i style="flex-grow:${(s[1] / base * 1000).toFixed(0)};background:${s[2]}" title="${s[0]}: ${money(s[1])}"></i>`).join('')}${out < inc ? '' : ''}</div>
+    <div class="scroll-x"><table><thead><tr><th>Part</th><th class="r">Amount</th><th class="r">Share of pay</th></tr></thead><tbody>
+      ${segs.map(s => `<tr><td><span class="sw" style="background:${s[2]}"></span>${s[0]}</td><td class="r num">${money(s[1])}</td><td class="r num">${pct(s[1])}</td></tr>`).join('')}
+      <tr><td><b style="font-weight:600">Pay this month</b></td><td class="r num"><b style="font-weight:500">${money(inc)}</b></td><td class="r num">100%</td></tr>
+    </tbody></table></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><h2>Pay vs money out, last 6 months</h2></div>
+    <div class="legend"><span><i style="background:var(--c1)"></i>Pay</span><span><i style="background:var(--c2)"></i>Spending + payables</span></div>
+    <div class="chart" data-chart="trend" role="img" aria-label="Pay and money out per month for the last six months"></div>
+  </section>
+  <section class="panel">
+    <div class="panel-head"><h2>Categories month by month</h2><span class="muted small">Spending + payables. Darker cells cost more.</span></div>
+    ${rows.length ? `<div class="scroll-x"><table class="heat"><thead><tr><th>Category</th>${months.map(m => `<th class="r">${mLabel(m)}</th>`).join('')}<th class="r">6-mo avg</th></tr></thead><tbody>
+      ${rows.map(r => `<tr><td>${esc(r.name)}</td>${r.vals.map(v => `<td class="r num" style="background:color-mix(in srgb, var(--accent) ${(v / cellMax * 42).toFixed(0)}%, transparent)">${v ? m0(v) : '–'}</td>`).join('')}<td class="r num muted">${m0(sum(r.vals) / 6)}</td></tr>`).join('')}
+      <tr class="tot"><td>Total</td>${colTotals.map(v => `<td class="r num">${m0(v)}</td>`).join('')}<td class="r num muted">${m0(sum(colTotals) / 6)}</td></tr>
+    </tbody></table></div>` : emptyBox('No spending or payables in the last 6 months.')}
+  </section>
+  <div class="grid-2">
+    <section class="panel"><h2>Week by week</h2>
+      <div class="bars">${weeks.map(w => `<div class="bar-row" style="cursor:default"><span class="small">${w.label}</span><span class="bar-track"><span class="bar-fill" style="width:${((w.spent + w.bills) / weekMax * 100).toFixed(1)}%"></span></span><span class="bar-val">${m0(w.spent + w.bills)}</span></div><div class="small muted" style="margin:-4px 0 4px 4px">${m0(w.spent)} spending (${w.n}) · ${m0(w.bills)} payables</div>`).join('')}</div>
+    </section>
+    <section class="panel"><h2>Pay by source</h2>
+      ${paySrc.length ? `<div class="list">${paySrc.map(p => `<div class="row"><div class="grow"><div class="title">${esc(p.source)}</div><div class="small muted">${p.n} payday${p.n === 1 ? '' : 's'} in ${esc(monthLabel)}</div></div><span class="num">${money(p.total)}</span><span class="chip">${pct(p.total)}</span></div>`).join('')}</div>` : emptyBox('No paydays in this month.', 'add-pay', 'Add pay')}
+    </section>
+  </div>
+  <section class="panel"><div class="panel-head"><h2>Credit card breakdown</h2><span class="muted small">Interest costs about ${money(interestTotal)} a month at today's balances</span></div>
+    ${cardRows.length ? `<div class="scroll-x"><table><thead><tr><th>Card</th><th class="r">Balance</th><th>Share of debt</th><th class="r">Interest / month</th><th class="r">Charged in ${esc(mLabel(mk))}</th><th>Mostly on</th></tr></thead><tbody>
+      ${cardRows.map(r => `<tr><td>${esc(r.c.name)} <span class="small muted">${esc(r.c.kind)}</span></td><td class="r num">${money(r.c.balance)}</td><td><div class="meter" style="min-width:80px"><i style="width:${(r.share * 100).toFixed(1)}%"></i></div><span class="small muted">${(r.share * 100).toFixed(0)}%</span></td><td class="r num">${money(r.interest)}</td><td class="r num">${money(r.charged)}</td><td class="muted">${r.top ? `${esc(r.top[0])} · ${m0(r.top[1])}` : '–'}</td></tr>`).join('')}
+    </tbody></table></div>` : emptyBox('No credit cards yet.', 'add-card', 'Add a card')}
+  </section>
+  <div class="grid-2">
+    <section class="panel"><h2>Payables by category</h2>
+      ${billsList.length ? (() => { const m = new Map(); billsList.forEach(x => m.set(catName(x.p.catId), (m.get(catName(x.p.catId)) || 0) + +x.p.amount)); const arr = [...m.entries()].sort((x, y) => y[1] - x[1]); const mx = arr[0][1]; return `<div class="bars">${arr.map(([n, v]) => `<div class="bar-row" style="cursor:default"><span>${esc(n)}</span><span class="bar-track"><span class="bar-fill" style="width:${(v / mx * 100).toFixed(1)}%"></span></span><span class="bar-val">${m0(v)}</span></div>`).join('')}</div>`; })() : emptyBox('No payables this month.')}
+    </section>
+    <section class="panel"><h2>Savings by account</h2>
+      ${S.accounts.length ? `<div class="list">${[...S.accounts].sort((x, y) => y.balance - x.balance).map(x => `<div class="row"><div class="grow"><div class="title">${esc(x.name)}</div><div class="meter" style="margin-top:4px"><i style="width:${savingsTotal ? (x.balance / savingsTotal * 100).toFixed(1) : 0}%"></i></div></div><span class="num">${money(x.balance)}</span><span class="chip">${savingsTotal ? (x.balance / savingsTotal * 100).toFixed(0) : 0}%</span></div>`).join('')}</div>` : emptyBox('No savings accounts yet.', 'add-account', 'Add an account')}
+    </section>
+  </div>`;
+}
+
+function drawTrend(el) {
+  const months = [5, 4, 3, 2, 1, 0].map(n => mkey(addMonths(parse(view.month + '-01'), -n)));
+  const data = months.map(m => ({ m, pay: incomeInMonth(m), out: sum(expensesInMonth(m), e => e.amount) + sum(payablesInMonth(m), x => x.p.amount) }));
+  const W = Math.max(300, el.clientWidth), H = W < 500 ? 200 : 230, L = 58, R = 8, T = 10, B = 26;
+  const top = Math.max(1, ...data.flatMap(d => [d.pay, d.out]));
+  const step = niceStep(top / 4), yMax = Math.ceil(top / step) * step;
+  const y = v => T + (1 - v / yMax) * (H - T - B);
+  const band = (W - L - R) / data.length, bw = Math.min(28, band * 0.32);
+  const bar = (x, v, color) => { const y0 = y(v), h = H - B - y0; if (h <= 0) return ''; const r = Math.min(4, h, bw / 2); return `<path d="M${x},${H - B} V${y0 + r} Q${x},${y0} ${x + r},${y0} H${x + bw - r} Q${x + bw},${y0} ${x + bw},${y0 + r} V${H - B} Z" fill="${color}"/>`; };
+  let g = '';
+  for (let v = 0; v <= yMax + 1e-6; v += step) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--mono)">${m0(v)}</text>`;
+  data.forEach((d, i) => {
+    const cx = L + band * i + band / 2;
+    g += bar(cx - bw - 1, d.pay, 'var(--c1)') + bar(cx + 1, d.out, 'var(--c2)');
+    g += `<text x="${cx}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${parse(d.m + '-01').toLocaleDateString(undefined, { month: 'short' })}</text>`;
+  });
+  el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}<rect class="hl" x="0" y="${T}" width="${band}" height="${H - T - B}" fill="var(--ink)" opacity="0" pointer-events="none"/><rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/></svg><div class="tt" hidden></div>`;
+  const svg = el.querySelector('svg'), tt = el.querySelector('.tt'), hl = el.querySelector('.hl');
+  const move = ev => {
+    const r = svg.getBoundingClientRect();
+    const i = Math.max(0, Math.min(data.length - 1, Math.floor((ev.clientX - r.left - L) / band)));
+    const d = data[i], net = d.pay - d.out;
+    hl.setAttribute('x', L + band * i); hl.setAttribute('opacity', '0.05');
+    tt.hidden = false;
+    tt.innerHTML = `<div class="eyebrow">${parse(d.m + '-01').toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</div><div class="ln"><span>Pay</span><span class="num">${m0(d.pay)}</span></div><div class="ln"><span>Spending + payables</span><span class="num">${m0(d.out)}</span></div><div class="ln"><span>${net >= 0 ? 'Left' : 'Short'}</span><span class="num">${m0(Math.abs(net))}</span></div>`;
+    const cx = L + band * i + band / 2;
+    tt.style.left = Math.max(0, Math.min(W - tt.offsetWidth, cx + 14 + tt.offsetWidth > W ? cx - 14 - tt.offsetWidth : cx + 14)) + 'px'; tt.style.top = T + 'px';
+  };
+  svg.addEventListener('pointermove', move); svg.addEventListener('pointerdown', move);
+  svg.addEventListener('pointerleave', () => { tt.hidden = true; hl.setAttribute('opacity', '0'); });
+}
+
 function drawChart(el) {
+  if (el.dataset.chart === 'trend') return drawTrend(el);
   const plan = buildPlan();
   const runs = [['avalanche', 'Highest rate', 'var(--s1)'], ['snowball', 'Smallest balance', 'var(--s2)'], ['minimum', 'Minimums', 'var(--s3)']].map(([k, l, c]) => ({ k, l, c, s: plan.runs[k].series, done: plan.runs[k].done }));
   const main = Math.max(runs[0].s.length, runs[1].s.length) - 1;
@@ -989,7 +1339,7 @@ const actions = {
   tab: id => { view.tab = id; try { localStorage.setItem('pl-tab', id); } catch {} render(); window.scrollTo(0, 0); },
   'month-prev': () => { view.month = mkey(addMonths(parse(view.month + '-01'), -1)); render(); },
   'month-next': () => { view.month = mkey(addMonths(parse(view.month + '-01'), 1)); render(); },
-  'start-fresh': () => { const cur = S.settings.currency; S = blankState(); S.settings.currency = cur; commit({ months: [] }); flushNow(); toast('Fresh start. Add your pay, cards and accounts.'); },
+  'start-fresh': () => { const cur = S.settings.currency; snapshot = null; S = blankState(); S.settings.currency = cur; commit({ months: [] }); flushNow(); toast('Fresh start. Add your pay, cards and accounts.'); },
   'keep-examples': () => { S.example = false; commit({ months: allExpenseMonths() }); toast('Examples kept. Edit or delete them as you go.'); },
   'add-expense': () => expenseForm(), 'edit-expense': id => expenseForm(S.expenses.find(e => e.id === id)),
   'add-card': () => cardForm(), 'edit-card': id => cardForm(S.cards.find(c => c.id === id)),
@@ -1017,6 +1367,8 @@ const actions = {
     try { await navigator.clipboard.writeText(data); toast('Backup copied to your clipboard.'); } catch { toast('Download was blocked. Try again from a browser tab.'); }
   },
   import: () => $('#import-file').click(),
+  'sync-now': () => syncNow(),
+  'sync-off': (id, el) => { if (!el.dataset.armed) { el.dataset.armed = '1'; el.textContent = 'Tap again to turn off'; return; } disconnectSync(); render(); toast('Sync is off on this device. Your data stays here.'); },
   reset: (id, el) => { if (!el.dataset.armed) { el.dataset.armed = '1'; el.textContent = 'Tap again to erase everything'; return; } const old = allExpenseMonths(); const cur = S.settings.currency; S = blankState(); S.settings.currency = cur; commit({ months: old }); toast('All data erased.'); }
 };
 function flushNow() { clearTimeout(saveTimer); flush(); }
@@ -1030,6 +1382,18 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.ma
 document.addEventListener('submit', e => {
   const f = e.target.closest('form[data-form]'); if (!f) return; e.preventDefault();
   if (f.dataset.form === 'add-item') { const c = catById(f.dataset.id); const label = f.elements.label.value.trim(); if (!label) return; c.items.push({ id: uid(), label, note: '' }); commit(); setTimeout(() => { const i = document.getElementById('ni-' + c.id); if (i) i.focus(); }, 0); }
+  if (f.dataset.form === 'sync') {
+    const token = f.elements.token.value.trim(), pass = f.elements.pass.value;
+    const err = $('#sync-err'), btn = f.querySelector('button[type=submit]');
+    const fail = m => { err.textContent = m; err.hidden = false; btn.disabled = false; btn.textContent = 'Connect'; };
+    if (!token) return fail('Paste your GitHub token.');
+    if (pass.length < 8) return fail('Use a passphrase of at least 8 characters.');
+    btn.disabled = true; btn.textContent = 'Connecting…'; err.hidden = true;
+    clearTimeout(saveTimer);
+    connectSync(token, pass).then(created => { render(); toast(created ? 'Sync is on. Now connect your other device.' : 'Sync is on. Your budget is up to date.'); })
+      .catch(e => { console.warn(e); fail(e.status === 401 ? 'GitHub did not accept that token. Check that you copied all of it.' : e.status === 403 || e.status === 404 ? 'That token cannot use gists. Create one with the gist box ticked.' : e.code === 'passphrase' ? 'That passphrase does not match the one you used on your other device.' : 'Could not reach GitHub. Check your connection and try again.'); });
+    return;
+  }
   if (f.dataset.form === 'settings') { const fd = new FormData(f); S.settings.currency = fd.get('currency'); S.settings.bufferMonths = Math.max(0, +fd.get('bufferMonths') || 0); S.settings.strategy = fd.get('strategy'); view.strategy = null; fmtCache = {}; commit(); toast('Settings saved'); }
 });
 $('#import-file').addEventListener('change', async e => {
@@ -1049,7 +1413,10 @@ window.__appBack = () => {
   if (view.tab !== 'overview') { actions.tab('overview'); return true; }
   return false;
 };
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && saveTimer && S && !S.example) flushNow(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && saveTimer && S && !S.example) flushNow();
+  if (document.visibilityState === 'visible' && S) queueSync(300);
+});
 
 initStore().then(render);
 })();

@@ -122,6 +122,19 @@ safety cushion before putting extra money toward cards.
   directly in a browser; it saves to that browser's local storage. Use
   Settings → Export backup to move data between devices.
 
+### Website and sync
+
+The same app is published as a website at https://nauuman.github.io/LabNotebook/
+by `.github/workflows/budget-website.yml` (it pushes the built page to the
+`gh-pages` branch).
+
+The website and the Android app can share one budget. In **Settings → Sync**,
+paste a GitHub token that has only the `gist` scope and choose a passphrase,
+then do the same on the other device. The budget is encrypted on the device
+(AES-GCM, key derived from the passphrase) and stored in a secret gist named
+`paycheck-ledger.sync`. Changes merge record by record, so edits made on both
+devices are kept, and deletions carry over.
+
 ### Android app
 
 `budget/android/` is an Android app (package `com.nauuman.paycheckledger`)
