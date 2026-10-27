@@ -2,6 +2,7 @@ package com.personal.podpulse.widget
 
 import android.content.Context
 import android.text.format.DateFormat
+import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
@@ -97,23 +98,23 @@ private fun CompactLayout(status: PodStatus) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (status.model.single) {
-            CompactCell("Max", status.left, status.leftCharging)
+            CompactCell(R.drawable.ic_headphones, status.left, status.leftCharging)
         } else {
-            CompactCell("L", status.left, status.leftCharging)
-            CompactCell("R", status.right, status.rightCharging)
-            CompactCell("C", status.case, status.caseCharging)
+            CompactCell(R.drawable.ic_bud_left, status.left, status.leftCharging)
+            CompactCell(R.drawable.ic_bud_right, status.right, status.rightCharging)
+            CompactCell(R.drawable.ic_case, status.case, status.caseCharging)
         }
     }
 }
 
 @Composable
-private fun RowScope.CompactCell(label: String, level: Int?, charging: Boolean) {
+private fun RowScope.CompactCell(@DrawableRes icon: Int, level: Int?, charging: Boolean) {
     Row(
         modifier = GlanceModifier.defaultWeight(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(label, style = TextStyle(color = ColorProvider(TextMuted), fontSize = 11.sp))
+        PartIcon(icon, 14)
         Spacer(GlanceModifier.width(3.dp))
         if (charging) Bolt(level, 11)
         Text(
@@ -156,18 +157,18 @@ private fun FullLayout(status: PodStatus) {
             verticalAlignment = Alignment.Bottom,
         ) {
             if (status.model.single) {
-                FullCell("Battery", status.left, status.leftCharging)
+                FullCell(R.drawable.ic_headphones, "Battery", status.left, status.leftCharging)
             } else {
-                FullCell("Left", status.left, status.leftCharging)
-                FullCell("Right", status.right, status.rightCharging)
-                FullCell("Case", status.case, status.caseCharging)
+                FullCell(R.drawable.ic_bud_left, "Left", status.left, status.leftCharging)
+                FullCell(R.drawable.ic_bud_right, "Right", status.right, status.rightCharging)
+                FullCell(R.drawable.ic_case, "Case", status.case, status.caseCharging)
             }
         }
     }
 }
 
 @Composable
-private fun RowScope.FullCell(label: String, level: Int?, charging: Boolean) {
+private fun RowScope.FullCell(@DrawableRes icon: Int, label: String, level: Int?, charging: Boolean) {
     Column(
         modifier = GlanceModifier.defaultWeight().padding(horizontal = 4.dp),
         horizontalAlignment = Alignment.Start,
@@ -183,7 +184,11 @@ private fun RowScope.FullCell(label: String, level: Int?, charging: Boolean) {
                 ),
             )
         }
-        Text(label, style = TextStyle(color = ColorProvider(TextMuted), fontSize = 11.sp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PartIcon(icon, 13)
+            Spacer(GlanceModifier.width(3.dp))
+            Text(label, style = TextStyle(color = ColorProvider(TextMuted), fontSize = 11.sp))
+        }
         Spacer(GlanceModifier.height(6.dp))
         LinearProgressIndicator(
             progress = (level ?: 0) / 100f,
@@ -192,6 +197,16 @@ private fun RowScope.FullCell(label: String, level: Int?, charging: Boolean) {
             backgroundColor = ColorProvider(Track),
         )
     }
+}
+
+@Composable
+private fun PartIcon(@DrawableRes icon: Int, sizeDp: Int) {
+    Image(
+        provider = ImageProvider(icon),
+        contentDescription = null,
+        modifier = GlanceModifier.size(sizeDp.dp),
+        colorFilter = ColorFilter.tint(ColorProvider(TextMuted)),
+    )
 }
 
 @Composable

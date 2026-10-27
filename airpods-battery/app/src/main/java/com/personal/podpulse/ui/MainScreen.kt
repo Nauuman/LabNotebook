@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.personal.podpulse.R
 import com.personal.podpulse.ble.ScanDiagnostics
 import com.personal.podpulse.data.AppSettings
 import com.personal.podpulse.data.LastSeen
@@ -271,6 +272,7 @@ private fun PodsCard(status: PodStatus, now: Long) {
                     size = min(200.dp, maxWidth),
                     dimmed = stale,
                     modifier = Modifier.align(Alignment.Center),
+                    icon = R.drawable.ic_headphones,
                 )
             } else {
                 Column(
@@ -283,14 +285,17 @@ private fun PodsCard(status: PodStatus, now: Long) {
                     ) {
                         BatteryRing(
                             status.left, "Left", status.leftCharging, status.leftInEar, big, stale,
+                            icon = R.drawable.ic_bud_left,
                         )
                         BatteryRing(
                             status.right, "Right", status.rightCharging, status.rightInEar, big, stale,
+                            icon = R.drawable.ic_bud_right,
                         )
                     }
                     Spacer(Modifier.height(8.dp))
                     BatteryRing(
                         status.case, "Case", status.caseCharging, false, big * 0.8f, stale,
+                        icon = R.drawable.ic_case,
                     )
                 }
             }

@@ -1,5 +1,6 @@
 package com.personal.podpulse.ui
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -68,6 +69,7 @@ fun BatteryRing(
     size: Dp,
     dimmed: Boolean,
     modifier: Modifier = Modifier,
+    @DrawableRes icon: Int? = null,
 ) {
     val color = levelColor(level)
     val progress by animateFloatAsState(
@@ -137,6 +139,14 @@ fun BatteryRing(
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (icon != null) {
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    tint = TextHi.copy(alpha = 0.85f),
+                    modifier = Modifier.size(size * 0.17f),
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (charging) {
                     Icon(
