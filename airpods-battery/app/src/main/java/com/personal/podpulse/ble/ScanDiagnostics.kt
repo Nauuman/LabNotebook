@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /** One decoded AirPods packet, kept for troubleshooting. */
-data class RawPacket(val hex: String, val rssi: Int, val decoded: String)
+data class RawPacket(val time: Long, val hex: String, val rssi: Int, val decoded: String)
 
 /** What the scanner has actually seen, shown in the app to troubleshoot. */
 data class Diagnostics(
@@ -24,7 +24,7 @@ data class Diagnostics(
  */
 object ScanDiagnostics {
     private const val PUBLISH_INTERVAL_MS = 500L
-    private const val RECENT_MAX = 6
+    private const val RECENT_MAX = 20
 
     private val _state = MutableStateFlow(Diagnostics())
     val state: StateFlow<Diagnostics> = _state.asStateFlow()
@@ -56,7 +56,8 @@ object ScanDiagnostics {
     @Synchronized
     fun onPodPacket(data: ByteArray, rssi: Int, decoded: String?) {
         val packet = RawPacket(
-            hex = data.take(12).joinToString(" ") { "%02X".format(it) },
+            time = System.currentTimeMillis(),
+            hex = data.joinToString(" ") { "%02X".format(it) },
             rssi = rssi,
             decoded = decoded ?: "not understood",
         )
@@ -65,6 +66,25 @@ object ScanDiagnostics {
             recent = (listOf(packet) + working.recent).take(RECENT_MAX),
             lastPodParsed = decoded != null,
         )
+    }
+
+    /** Plain-text report of what's been heard, for pasting into a bug report. */
+    @Synchronized
+    fun report(): String {
+        val d = working
+        val clock = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+        return buildString {
+            appendLine("PodPulse diagnostics")
+            appendLine("${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}, Android ${android.os.Build.VERSION.RELEASE}")
+            appendLine("Live scan: ${d.liveScan}")
+            appendLine("Packets: ${d.anyPackets} total, ${d.applePackets} Apple, ${d.podPackets} AirPods")
+            appendLine("Apple types: ${d.appleTypes.sorted().joinToString(" ") { "%02X".format(it) }}")
+            appendLine()
+            d.recent.forEach {
+                appendLine("${clock.format(java.util.Date(it.time))} ${it.rssi}dBm ${it.hex}")
+                appendLine("  -> ${it.decoded}")
+            }
+        }
     }
 
     private fun publish(force: Boolean = false) {

@@ -274,7 +274,7 @@ private fun PodsCard(status: PodStatus, now: Long) {
                     size = min(200.dp, maxWidth),
                     dimmed = stale,
                     modifier = Modifier.align(Alignment.Center),
-                    icon = R.drawable.ic_headphones,
+                    art = PodArtKind.Headphones,
                     caption = chargeCaption(context, ChargeEstimator.Part.LEFT, status.left, status.leftCharging),
                 )
             } else {
@@ -288,13 +288,13 @@ private fun PodsCard(status: PodStatus, now: Long) {
                     ) {
                         BatteryRing(
                             status.left, "Left", status.leftCharging, status.leftInEar, big, stale,
-                            icon = R.drawable.ic_bud_left,
+                            art = PodArtKind.LeftBud,
                             inCase = status.leftInCase,
                             caption = chargeCaption(context, ChargeEstimator.Part.LEFT, status.left, status.leftCharging),
                         )
                         BatteryRing(
                             status.right, "Right", status.rightCharging, status.rightInEar, big, stale,
-                            icon = R.drawable.ic_bud_right,
+                            art = PodArtKind.RightBud,
                             inCase = status.rightInCase,
                             caption = chargeCaption(context, ChargeEstimator.Part.RIGHT, status.right, status.rightCharging),
                         )
@@ -302,7 +302,7 @@ private fun PodsCard(status: PodStatus, now: Long) {
                     Spacer(Modifier.height(8.dp))
                     BatteryRing(
                         status.case, "Case", status.caseCharging, false, big * 0.8f, stale,
-                        icon = R.drawable.ic_case,
+                        art = PodArtKind.Case,
                         caption = chargeCaption(context, ChargeEstimator.Part.CASE, status.case, status.caseCharging),
                     )
                 }
@@ -560,6 +560,7 @@ private fun Hint(text: String, button: String, onClick: () -> Unit) {
 
 @Composable
 private fun DiagnosticsCard(env: EnvState, expandedByDefault: Boolean) {
+    val context = LocalContext.current
     val d by ScanDiagnostics.state.collectAsStateWithLifecycle()
     var expanded by rememberSaveable { mutableStateOf(expandedByDefault) }
     GlassCard(Modifier.clickable { expanded = !expanded }) {
@@ -601,12 +602,23 @@ private fun DiagnosticsCard(env: EnvState, expandedByDefault: Boolean) {
                 d.appleTypes.sorted().joinToString(" ") { "%02X".format(it) }.ifEmpty { "-" },
             )
             DiagLine("AirPods packets", d.podPackets.toString())
+            Spacer(Modifier.height(10.dp))
+            Button(
+                onClick = {
+                    val clipboard = context.getSystemService(ClipboardManager::class.java)
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("PodPulse diagnostics", ScanDiagnostics.report()))
+                    Toast.makeText(context, "Diagnostics copied — paste them to Claude", Toast.LENGTH_SHORT).show()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Bg0),
+            ) {
+                Text("Copy diagnostics", fontWeight = FontWeight.SemiBold)
+            }
             if (d.recent.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Latest AirPods packets (raw → decoded)", color = Muted, fontSize = 12.sp)
-                d.recent.forEach { p ->
+                d.recent.take(6).forEach { p ->
                     Text(
-                        "${p.hex}  ${p.rssi}dBm\n  → ${p.decoded}",
+                        "${p.hex.take(35)}…  ${p.rssi}dBm\n  → ${p.decoded}",
                         color = TextHi,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,

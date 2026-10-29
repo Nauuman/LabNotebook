@@ -1,6 +1,5 @@
 package com.personal.podpulse.ui
 
-import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -74,7 +73,7 @@ fun BatteryRing(
     size: Dp,
     dimmed: Boolean,
     modifier: Modifier = Modifier,
-    @DrawableRes icon: Int? = null,
+    art: PodArtKind? = null,
     inCase: Boolean = false,
     caption: String? = null,
 ) {
@@ -174,13 +173,12 @@ fun BatteryRing(
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (icon != null) {
-                Icon(
-                    painter = painterResource(icon),
-                    contentDescription = null,
-                    tint = TextHi.copy(alpha = 0.85f),
+            if (art != null) {
+                PodArt(
+                    kind = art,
+                    ledOn = art == PodArtKind.Case && charging,
                     modifier = Modifier
-                        .size(size * 0.17f)
+                        .size(size * 0.22f)
                         .graphicsLayer {
                             if (inCase || charging) {
                                 rotationY = spin

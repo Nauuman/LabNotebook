@@ -90,9 +90,19 @@ class AirPodsParserTest {
     }
 
     @Test
-    fun ignoresOtherProximityMessages() {
+    fun acceptsOtherMessageLengths() {
         val other = packet(0x1420, 0x20, 0x99, 0x35).also { it[1] = 0x11 }
-        assertNull(AirPodsParser.parse(other, -50, 1L))
+        assertEquals(90, AirPodsParser.parse(other, -50, 1L)!!.left)
+    }
+
+    @Test
+    fun inCaseFlagBeatsInEarFlag() {
+        // both-in-case (0x04) plus a stray in-ear bit (0x02): the case wins
+        val s = AirPodsParser.parse(packet(0x1420, 0x26, 0x99, 0x38), -50, 1L)!!
+        assertTrue(s.leftInCase)
+        assertFalse(s.leftInEar)
+        assertTrue(s.leftCharging)
+        assertTrue(s.rightCharging)
     }
 
     @Test

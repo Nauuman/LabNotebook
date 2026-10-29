@@ -20,12 +20,10 @@ object AirPodsParser {
     const val APPLE_COMPANY_ID = 0x004C
     const val PROXIMITY_PAIRING = 0x07
 
-    /** The battery message's length byte. Other 0x07 messages use a different layout. */
-    private const val BATTERY_MESSAGE_LENGTH = 0x19
-
     fun parse(data: ByteArray?, rssi: Int, timestamp: Long): PodStatus? {
         if (data == null || data.size < 10) return null
-        if (data[0].u() != PROXIMITY_PAIRING || data[1].u() != BATTERY_MESSAGE_LENGTH) return null
+        // The length byte (data[1]) varies between models and firmware, so it isn't checked.
+        if (data[0].u() != PROXIMITY_PAIRING) return null
 
         val modelId = (data[3].u() shl 8) or data[4].u()
         val status = data[5].u()
@@ -48,41 +46,55 @@ object AirPodsParser {
 
         // The nibble order of left/right swaps depending on which bud is primary.
         val flipped = (status and 0x20) == 0
-        val left = level(if (flipped) pods shr 4 else pods and 0x0F)
-        val right = level(if (flipped) pods and 0x0F else pods shr 4)
+        val leftLevel = level(if (flipped) pods shr 4 else pods and 0x0F)
+        val rightLevel = level(if (flipped) pods and 0x0F else pods shr 4)
         val case = level(flags and 0x0F)
-        if (left == null && right == null && case == null) return null
+        if (leftLevel == null && rightLevel == null && case == null) return null
 
-        val leftInEar = (status and (if (flipped) 0x08 else 0x02)) != 0
-        val rightInEar = (status and (if (flipped) 0x02 else 0x08)) != 0
-
-        // A bud in your ear can't be charging or in the case: that flag wins.
-        // Otherwise a charging bud is always in the case.
-        val leftCharging = !leftInEar && (charging and (if (flipped) 0x02 else 0x01)) != 0
-        val rightCharging = !rightInEar && (charging and (if (flipped) 0x01 else 0x02)) != 0
         val thisIsLeft = !flipped
         val thisInCase = (status and 0x40) != 0
         val bothInCase = (status and 0x04) != 0
         val oneInCase = (status and 0x10) != 0
-        val leftInCase = !leftInEar &&
-            (leftCharging || bothInCase || (oneInCase && thisInCase == thisIsLeft))
-        val rightInCase = !rightInEar &&
-            (rightCharging || bothInCase || (oneInCase && thisInCase != thisIsLeft))
+        val left = BudState.of(
+            caseFlag = bothInCase || (oneInCase && thisInCase == thisIsLeft),
+            earFlag = (status and (if (flipped) 0x08 else 0x02)) != 0,
+            chargeFlag = (charging and (if (flipped) 0x02 else 0x01)) != 0,
+        )
+        val right = BudState.of(
+            caseFlag = bothInCase || (oneInCase && thisInCase != thisIsLeft),
+            earFlag = (status and (if (flipped) 0x02 else 0x08)) != 0,
+            chargeFlag = (charging and (if (flipped) 0x01 else 0x02)) != 0,
+        )
         return PodStatus(
             modelId = modelId,
-            left = left,
-            right = right,
+            left = leftLevel,
+            right = rightLevel,
             case = case,
-            leftCharging = leftCharging,
-            rightCharging = rightCharging,
+            leftCharging = left.charging,
+            rightCharging = right.charging,
             caseCharging = (charging and 0x04) != 0,
-            leftInEar = leftInEar,
-            rightInEar = rightInEar,
-            leftInCase = leftInCase,
-            rightInCase = rightInCase,
+            leftInEar = left.inEar,
+            rightInEar = right.inEar,
+            leftInCase = left.inCase,
+            rightInCase = right.inCase,
             rssi = rssi,
             timestamp = timestamp,
         )
+    }
+
+    /**
+     * Resolves contradicting flags for one bud, most trustworthy first:
+     * the in-case flag, then the in-ear flag (a bud in your ear can't be
+     * charging), then charging (a charging bud is in the case).
+     */
+    private data class BudState(val inCase: Boolean, val inEar: Boolean, val charging: Boolean) {
+        companion object {
+            fun of(caseFlag: Boolean, earFlag: Boolean, chargeFlag: Boolean) = when {
+                caseFlag -> BudState(inCase = true, inEar = false, charging = chargeFlag)
+                earFlag -> BudState(inCase = false, inEar = true, charging = false)
+                else -> BudState(inCase = chargeFlag, inEar = false, charging = chargeFlag)
+            }
+        }
     }
 
     private fun level(raw: Int): Int? = if (raw in 0..10) raw * 10 else null
